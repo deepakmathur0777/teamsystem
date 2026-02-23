@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Login - Team System</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  font-family:Inter,Segoe UI,sans-serif;
+  background:radial-gradient(circle at top,#1e3a8a,#07122a);
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  color:#e5e7eb;
+}
+
+/* ===== CONTAINER ===== */
+.login-container{
+  width:100%;
+  max-width:420px;
+  padding:20px;
+}
+
+/* ===== CARD ===== */
+.login-card{
+  background:rgba(13,27,58,.9);
+  backdrop-filter:blur(12px);
+  padding:45px 40px;
+  border-radius:18px;
+  text-align:center;
+  box-shadow:0 25px 60px rgba(0,0,0,.6);
+  animation:fadeIn .8s ease;
+}
+
+@keyframes fadeIn{
+  from{opacity:0;transform:translateY(30px);}
+  to{opacity:1;transform:translateY(0);}
+}
+
+h1{margin-bottom:6px;font-size:26px;}
+.subtitle{margin-bottom:30px;color:#94a3b8;}
+
+/* ===== INPUT ===== */
+input{
+  width:100%;
+  padding:13px 14px;
+  margin-bottom:18px;
+  border-radius:10px;
+  border:1px solid transparent;
+  background:#07122a;
+  color:white;
+  outline:none;
+  transition:.25s;
+}
+
+input:focus{
+  border-color:#3b82f6;
+  box-shadow:0 0 10px rgba(59,130,246,.5);
+}
+
+/* ===== PASSWORD GROUP ===== */
+.password-group{
+  position:relative;
+}
+
+.password-group input{
+  padding-right:40px;
+}
+
+.toggle-eye{
+  position:absolute;
+  right:12px;
+  top:50%;
+  transform:translateY(-50%);
+  cursor:pointer;
+  opacity:.7;
+  font-size:16px;
+  transition:.2s;
+}
+
+.toggle-eye:hover{
+  opacity:1;
+  transform:translateY(-50%) scale(1.15);
+}
+
+/* ===== BUTTON ===== */
+button{
+  width:100%;
+  padding:13px;
+  border-radius:10px;
+  border:none;
+  background:linear-gradient(135deg,#6366f1,#3b82f6);
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+  transition:.25s;
+}
+
+button:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 20px rgba(0,0,0,.4);
+}
+
+/* ===== ERROR ===== */
+.error{
+  color:#ef4444;
+  margin-top:12px;
+  font-size:13px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="login-container">
+
+  <div class="login-card">
+
+    <h1>🚀 Team System</h1>
+    <p class="subtitle">Login to continue</p>
+
+    <form id="loginForm">
+
+      <input type="email" id="email" placeholder="Email" required>
+
+      <div class="password-group">
+        <input type="password" id="password" placeholder="Password" required>
+        <span class="toggle-eye" onclick="togglePassword()">👁</span>
+      </div>
+
+      <button type="submit">Login</button>
+    </form>
+
+    <p id="errorMessage" class="error"></p>
+
+  </div>
+</div>
+
+<!-- ===== PASSWORD TOGGLE JS ===== -->
+<script>
+function togglePassword(){
+  const input = document.getElementById("password");
+  const eye = document.querySelector(".toggle-eye");
+
+  if(input.type === "password"){
+    input.type = "text";
+    eye.textContent = "🙈";
+  }else{
+    input.type = "password";
+    eye.textContent = "👁";
+  }
+}
+</script>
+
+<!-- ===== YOUR MAIN LOGIN JS ===== -->
+<script type="module" src="login.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,147 @@
+/* =========================
+   PAGE GRID
+========================= */
+body{
+  margin:0;
+  font-family:Inter, Segoe UI, sans-serif;
+  background:#0f172a;
+  color:#e5e7eb;
+  height:100vh;
+  overflow:hidden;
+}
+
+.container{
+  height:100vh;
+  padding:14px;
+}
+
+.main-grid{
+  height:100%;
+  display:grid;
+  grid-template-columns: 1fr 280px; /* small chart column */
+  grid-template-rows:auto 1fr;
+  gap:12px;
+}
+
+/* =========================
+   LEFT SIDE
+========================= */
+.left-top{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* HERO */
+.hero{
+  background:#111827;
+  border-radius:10px;
+  padding:12px 16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.hero h1{font-size:16px;}
+.hero-metric{font-size:20px;color:#22c55e;}
+.hero-status{font-size:11px;opacity:.7}
+
+/* STATS */
+.stats{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+}
+
+.card{
+  background:#111827;
+  padding:10px;
+  border-radius:8px;
+  text-align:center;
+}
+
+.card h2{font-size:16px;color:#38bdf8;}
+.card p{font-size:10px;opacity:.7}
+
+/* =========================
+   RIGHT SIDE SMALL GRAPH
+========================= */
+.right-top{
+  grid-row:1 / span 2;
+  background:#111827;
+  border-radius:10px;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+}
+
+.chart-card{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+}
+
+.chart-card h3{
+  font-size:12px;
+  margin-bottom:6px;
+}
+
+#myChart{
+  max-height:200px !important;   /* KEY FIX */
+  width:100% !important;
+}
+
+/* =========================
+   TABLE BIG AREA
+========================= */
+.bottom{
+  grid-column:1;
+  min-height:0;
+}
+
+.table-section{
+  background:#111827;
+  border-radius:10px;
+  padding:8px;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+}
+
+.table-wrapper{
+  flex:1;
+  overflow:auto;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+}
+
+th{
+  background:#1f2937;
+  padding:8px;
+  position:sticky;
+  top:0;
+}
+
+td{
+  padding:8px;
+  border-bottom:1px solid #1f2937;
+}
+
+tr:hover{background:#1e293b}
+
+/* =========================
+   BUTTON
+========================= */
+.toggle-btn{
+  background:#2563eb;
+  border:none;
+  padding:5px 10px;
+  border-radius:6px;
+  font-size:11px;
+  color:white;
+  cursor:pointer;
+}

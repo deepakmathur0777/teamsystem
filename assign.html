@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Assign Task</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  font-family:Inter,Segoe UI,sans-serif;
+  background:radial-gradient(circle at top,#1e3a8a,#07122a);
+  color:#e5e7eb;
+  min-height:100vh;
+}
+
+/* ===== CONTAINER ===== */
+.container{
+  max-width:900px;
+  margin:auto;
+  padding:25px;
+}
+
+/* ===== HERO ===== */
+.hero{
+  background:linear-gradient(135deg,#0d1b3a,#1e3a8a);
+  padding:25px 30px;
+  border-radius:18px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 15px 40px rgba(0,0,0,.5);
+  margin-bottom:25px;
+}
+
+.hero h1{
+  font-size:26px;
+}
+
+.hero-sub{
+  opacity:.75;
+  margin-top:6px;
+}
+
+/* ===== BUTTON ===== */
+.switch-btn{
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  padding:6px 14px;
+  border-radius:8px;
+  text-decoration:none;
+  font-size:13px;
+  margin-left:10px;
+}
+
+/* ===== CARD ===== */
+.card{
+  background:rgba(13,27,58,.9);
+  backdrop-filter:blur(12px);
+  padding:35px 30px;
+  border-radius:18px;
+  box-shadow:0 25px 60px rgba(0,0,0,.6);
+}
+
+/* ===== FORM ===== */
+form{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+label{
+  font-size:13px;
+  opacity:.8;
+}
+
+input,select{
+  padding:12px;
+  border-radius:10px;
+  border:1px solid transparent;
+  background:#07122a;
+  color:white;
+  outline:none;
+  transition:.25s;
+}
+
+input:focus,select:focus{
+  border-color:#3b82f6;
+  box-shadow:0 0 10px rgba(59,130,246,.5);
+}
+
+/* ===== PRIORITY COLORS ===== */
+select option[value="low"]{color:#22c55e;}
+select option[value="medium"]{color:#f59e0b;}
+select option[value="high"]{color:#ef4444;}
+
+/* ===== BUTTON ===== */
+.toggle-btn{
+  margin-top:10px;
+  padding:13px;
+  border:none;
+  border-radius:10px;
+  background:linear-gradient(135deg,#6366f1,#3b82f6);
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+  transition:.25s;
+}
+
+.toggle-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 20px rgba(0,0,0,.4);
+}
+
+/* ===== MESSAGE ===== */
+#message{
+  margin-top:15px;
+  font-size:13px;
+}
+
+/* ===== MOBILE ===== */
+@media(max-width:600px){
+  .hero{
+    flex-direction:column;
+    gap:10px;
+    text-align:center;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div>
+      <h1>📋 Assign New Task</h1>
+      <p class="hero-sub">
+        Create and assign work to team members
+      </p>
+    </div>
+
+    <div>
+      <a href="dashboard.html" class="switch-btn">👥 Team</a>
+      <a href="personal.html" class="switch-btn">👤 Personal</a>
+    </div>
+  </div>
+
+  <!-- CARD -->
+  <div class="card">
+
+    <form id="assignForm">
+
+      <label>Task Title</label>
+      <input type="text" id="title" placeholder="Enter task title" required>
+
+      <label>Assign To</label>
+      <select id="userDropdown" required>
+        <option value="">Loading users...</option>
+      </select>
+
+      <label>Deadline</label>
+      <input type="date" id="deadline" required>
+
+      <label>Priority</label>
+      <select id="priority">
+        <option value="low">🟢 Low</option>
+        <option value="medium">🟡 Medium</option>
+        <option value="high">🔴 High</option>
+      </select>
+
+      <button type="submit" class="toggle-btn">
+        Assign Task
+      </button>
+
+    </form>
+
+    <p id="message"></p>
+
+  </div>
+
+</div>
+
+<script type="module" src="assign.js"></script>
+</body>
+</html>
