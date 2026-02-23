@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Team Transparency Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  font-family:Inter,Segoe UI,sans-serif;
+  background:radial-gradient(circle at top,#0f1e44,#07122a);
+  color:#e5e7eb;
+}
+
+/* ===== CONTAINER ===== */
+.container{
+  max-width:1400px;
+  margin:auto;
+  padding:20px;
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  gap:18px;
+}
+
+/* ===== HERO ===== */
+.hero{
+  grid-column:1/span 2;
+  background:linear-gradient(135deg,#0d1b3a,#1e3a8a);
+  padding:18px 20px;
+  border-radius:16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+
+.hero h2{font-weight:600;}
+
+.hero-buttons{
+  display:flex;
+  gap:10px;
+}
+
+.switch-btn{
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:white;
+  padding:6px 14px;
+  border-radius:8px;
+  text-decoration:none;
+  font-size:13px;
+  transition:.25s;
+}
+.switch-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 16px rgba(0,0,0,.35);
+}
+
+/* ===== STATS ===== */
+.stats{
+  grid-column:1/span 2;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:14px;
+}
+
+.card{
+  background:#0d1b3a;
+  padding:14px;
+  border-radius:14px;
+  text-align:center;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  transition:.25s;
+}
+.card:hover{transform:translateY(-4px);}
+
+.card h3{
+  color:#38bdf8;
+  font-size:24px;
+}
+.card p{
+  font-size:12px;
+  opacity:.7;
+}
+
+/* ===== PROGRESS BAR ===== */
+.progress-container{
+  grid-column:1/span 2;
+  background:#0d1b3a;
+  border-radius:10px;
+  overflow:hidden;
+  height:14px;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+}
+
+.progress-bar{
+  height:100%;
+  background:linear-gradient(90deg,#22c55e,#06b6d4);
+  width:0%;
+}
+
+/* ===== TABLE ===== */
+.table-section{
+  background:#0d1b3a;
+  border-radius:14px;
+  padding:14px;
+  overflow:auto;
+  max-height:70vh;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
+}
+
+.table-section h3{
+  margin-bottom:10px;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+th{
+  background:#162447;
+  padding:10px;
+  text-align:left;
+}
+
+td{
+  padding:10px;
+  border-bottom:1px solid #162447;
+}
+
+tr:hover{
+  background:#14213d;
+}
+
+/* ===== SIDE ===== */
+.side{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.chart-card,
+.member-box{
+  background:#0d1b3a;
+  border-radius:14px;
+  padding:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
+}
+
+.chart-card canvas{
+  height:180px !important;
+}
+
+/* ===== MEMBERS ===== */
+.member-box{
+  overflow:auto;
+  max-height:60vh;
+}
+
+.member-card{
+  background:#07122a;
+  padding:10px;
+  border-radius:8px;
+  margin-bottom:8px;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.member-card:hover{
+  background:#14213d;
+}
+
+.member-tasks{
+  display:none;
+  margin-top:6px;
+  font-size:12px;
+}
+
+.member-card.open .member-tasks{
+  display:block;
+}
+
+.badge{
+  padding:2px 6px;
+  border-radius:6px;
+  font-size:10px;
+}
+
+.completed{background:#16a34a;}
+.pending{background:#d97706;}
+
+.member-search{
+  padding:6px;
+  border-radius:6px;
+  border:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- HERO -->
+<div class="hero">
+  <h2>Team Transparency Dashboard</h2>
+
+  <div class="hero-buttons">
+    <a href="personal.html" class="switch-btn">👤 Personal Dashboard</a>
+    <input id="memberFilter" class="member-search" placeholder="Search member...">
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="card"><h3 id="totalTasks">0</h3><p>Total Tasks</p></div>
+  <div class="card"><h3 id="completedTasks">0</h3><p>Completed</p></div>
+  <div class="card"><h3 id="pendingTasks">0</h3><p>Pending</p></div>
+  <div class="card"><h3 id="overdueTasks">0</h3><p>Overdue</p></div>
+  <div class="card"><h3 id="completionRate">0%</h3><p>Completion %</p></div>
+  <div class="card"><h3 id="efficiencyRate">0%</h3><p>Efficiency %</p></div>
+</div>
+
+<div class="progress-container">
+  <div id="progressBar" class="progress-bar"></div>
+</div>
+
+<!-- TABLE -->
+<div class="table-section">
+  <h3>Task List</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Assigned</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="taskTable"></tbody>
+  </table>
+</div>
+
+<!-- SIDE -->
+<div class="side">
+
+  <div class="chart-card">
+    <h3>Work Distribution</h3>
+    <canvas id="progressChart"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h3>Weekly Trend</h3>
+    <canvas id="weeklyChart"></canvas>
+  </div>
+
+  <div class="member-box">
+    <h3>Members</h3>
+    <div id="memberStats"></div>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+document.getElementById("memberFilter").addEventListener("input", e=>{
+  const text=e.target.value.toLowerCase();
+  document.querySelectorAll(".member-card").forEach(card=>{
+    card.style.display =
+      card.innerText.toLowerCase().includes(text)
+        ? "block":"none";
+  });
+});
+function toggleMember(el){ el.classList.toggle("open"); }
+</script>
+
+<script type="module" src="script.js"></script>
+
+</body>
+</html>
