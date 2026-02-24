@@ -18,14 +18,14 @@ import {
 /* ================= FIREBASE CONFIG ================= */
 
 const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "hirelens-studio.firebaseapp.com",
-  projectId: "hirelens-studio",
-  storageBucket: "hirelens-studio.firebasestorage.app",
-  messagingSenderId: "274271462149",
-  appId: "1:274271462149:web:6df015d15a7c908a900d6c"
-};
-
+    apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
+    authDomain: "hirelens-studio.firebaseapp.com",
+    projectId: "hirelens-studio",
+    storageBucket: "hirelens-studio.firebasestorage.app",
+    messagingSenderId: "274271462149",
+    appId: "1:274271462149:web:6df015d15a7c908a900d6c",
+    measurementId: "G-P3JRC27VCE"
+  };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -235,3 +235,4 @@ function renderAdmin(members, totalOverdue, dueToday, longPending) {
   console.log("Due Today:", dueToday);
   console.log("Long Pending:", longPending);
 }
+
