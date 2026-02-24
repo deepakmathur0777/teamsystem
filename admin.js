@@ -32,16 +32,24 @@ onAuthStateChanged(auth, async (user) => {
   await checkAdmin(user);
 });
 
-/* ================= CHECK ADMIN ================= */
-
-import { query, where } from 
-"https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+  collection,
+  getDocs,
+  query,
+  where 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 async function checkAdmin(user) {
 
+  if (!user || !user.email) {
+    alert("User not logged in");
+    window.location.href = "login.html";
+    return;
+  }
+
   const q = query(
     collection(db, "users"),
-    where("email", "==", user.email)
+    where("email", "==", user.email.toLowerCase())
   );
 
   const snap = await getDocs(q);
@@ -60,6 +68,7 @@ async function checkAdmin(user) {
     return;
   }
 
+  console.log("Admin verified");
   loadAdminData();
 }
 
@@ -215,4 +224,5 @@ function renderAdmin(members,totalOverdue,dueToday,longPending){
 
   console.log("Due Today:",dueToday);
   console.log("Long Pending:",longPending);
+
 }
