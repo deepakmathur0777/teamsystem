@@ -1,8 +1,13 @@
+/* ================= FIREBASE IMPORTS ================= */
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+
 import {
   getFirestore,
   collection,
-  getDocs
+  getDocs,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import {
@@ -25,31 +30,25 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-/* ================= AUTH ================= */
+/* ================= AUTH CHECK ================= */
 
 onAuthStateChanged(auth, async (user) => {
-  if (!user) return window.location.href = "login.html";
-  await checkAdmin(user);
-});
-
-import { 
-  collection,
-  getDocs,
-  query,
-  where 
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-async function checkAdmin(user) {
-
-  if (!user || !user.email) {
-    alert("User not logged in");
+  if (!user) {
     window.location.href = "login.html";
     return;
   }
+  await checkAdmin(user);
+});
+
+/* ================= ADMIN CHECK (EMAIL LOCKED) ================= */
+
+async function checkAdmin(user) {
+
+  const email = user.email?.trim().toLowerCase();
 
   const q = query(
     collection(db, "users"),
-    where("email", "==", user.email.toLowerCase())
+    where("email", "==", email)
   );
 
   const snap = await getDocs(q);
@@ -62,22 +61,22 @@ async function checkAdmin(user) {
 
   const data = snap.docs[0].data();
 
-  if (data.role !== "admin") {
+  if (!data.role || data.role.toLowerCase() !== "admin") {
     alert("Access Denied: Admin Only");
     window.location.href = "personal.html";
     return;
   }
 
-  console.log("Admin verified");
+  console.log("Admin verified:", email);
   loadAdminData();
 }
 
-/* ================= LOAD DATA ================= */
+/* ================= LOAD ADMIN DATA ================= */
 
-async function loadAdminData(){
+async function loadAdminData() {
 
-  const usersSnap = await getDocs(collection(db,"users"));
-  const tasksSnap = await getDocs(collection(db,"tasks"));
+  const usersSnap = await getDocs(collection(db, "users"));
+  const tasksSnap = await getDocs(collection(db, "tasks"));
 
   const members = {};
   const now = new Date();
@@ -86,111 +85,121 @@ async function loadAdminData(){
   let dueToday = 0;
   let longPending = 0;
 
-  /* INIT MEMBERS */
-  usersSnap.forEach(doc=>{
+  /* ===== INIT MEMBERS ===== */
+
+  usersSnap.forEach(doc => {
     const u = doc.data();
-    if(u.role==="member"){
-      members[u.email] = {
-        name:u.name,
-        total:0,
-        completed:0,
-        pending:0,
-        overdue:0,
-        onTime:0,
-        late:0,
-        totalDelay:0,
-        delayCount:0
+
+    if (u.role && u.role.toLowerCase() === "member") {
+      members[u.email.toLowerCase()] = {
+        name: u.name,
+        total: 0,
+        completed: 0,
+        pending: 0,
+        overdue: 0,
+        onTime: 0,
+        late: 0,
+        totalDelay: 0,
+        delayCount: 0
       };
     }
   });
 
-  /* PROCESS TASKS */
-  tasksSnap.forEach(doc=>{
+  /* ===== PROCESS TASKS ===== */
+
+  tasksSnap.forEach(doc => {
 
     const t = doc.data();
-    const deadline = t.deadline?.toDate();
-    if(!deadline) return;
+    const deadline = t.deadline?.toDate?.();
+    if (!deadline) return;
 
-    const m = members[t.assignedToEmail];
-    if(!m) return;
+    const assignedEmail = t.assignedToEmail?.toLowerCase();
+    const member = members[assignedEmail];
+    if (!member) return;
 
-    m.total++;
+    member.total++;
 
     const isToday =
       deadline.toDateString() === now.toDateString();
 
-    if(isToday) dueToday++;
+    if (isToday) dueToday++;
 
-    if(t.status==="completed"){
+    if (t.status === "completed") {
 
-      m.completed++;
+      member.completed++;
 
-      if(t.completedAt){
+      if (t.completedAt) {
 
         const done =
           t.completedAt.toDate
             ? t.completedAt.toDate()
             : new Date(t.completedAt);
 
-        if(done <= deadline){
-          m.onTime++;
-        }else{
-          m.late++;
+        if (done <= deadline) {
+          member.onTime++;
+        } else {
+          member.late++;
 
           const delay =
-            (done - deadline)/(1000*60*60*24);
+            (done - deadline) / (1000 * 60 * 60 * 24);
 
-          m.totalDelay += delay;
-          m.delayCount++;
+          member.totalDelay += delay;
+          member.delayCount++;
         }
       }
 
-    }else{
+    } else {
 
-      m.pending++;
+      member.pending++;
 
-      if(deadline < now){
-        m.overdue++;
+      if (deadline < now) {
+        member.overdue++;
         totalOverdue++;
 
         const days =
-          (now - deadline)/(1000*60*60*24);
+          (now - deadline) / (1000 * 60 * 60 * 24);
 
-        if(days>5) longPending++;
+        if (days > 5) longPending++;
       }
     }
   });
 
-  renderAdmin(members,totalOverdue,dueToday,longPending);
+  renderAdmin(members, totalOverdue, dueToday, longPending);
 }
 
-/* ================= RENDER ================= */
+/* ================= RENDER DASHBOARD ================= */
 
-function renderAdmin(members,totalOverdue,dueToday,longPending){
+function renderAdmin(members, totalOverdue, dueToday, longPending) {
 
-  const container =
-    document.getElementById("memberOverview");
-  container.innerHTML="";
+  const container = document.getElementById("memberOverview");
+  container.innerHTML = "";
 
   const list = Object.values(members);
 
-  /* LEADERBOARD */
+  /* ===== LEADERBOARD ===== */
+
   const top =
-    [...list].sort((a,b)=>
-      (b.completed/b.total||0) -
-      (a.completed/a.total||0)
-    ).slice(0,3);
+    [...list]
+      .sort((a, b) =>
+        (b.completed / b.total || 0) -
+        (a.completed / a.total || 0)
+      )
+      .slice(0, 3);
 
-  console.log("Top Performers:",top);
+  console.log("Top Performers:", top);
 
-  list.forEach(m=>{
+  /* ===== MEMBER CARDS ===== */
+
+  list.forEach(m => {
 
     const rate =
-      m.total ? ((m.completed/m.total)*100).toFixed(1):0;
+      m.total
+        ? ((m.completed / m.total) * 100).toFixed(1)
+        : 0;
 
     const avgDelay =
       m.delayCount
-        ? (m.totalDelay/m.delayCount).toFixed(1)
+        ? (m.totalDelay / m.delayCount).toFixed(1)
         : 0;
 
     container.innerHTML += `
@@ -210,19 +219,19 @@ function renderAdmin(members,totalOverdue,dueToday,longPending){
     `;
   });
 
-  /* TOP STATS */
-  document.getElementById("totalMembers")
-    .innerText = list.length;
+  /* ===== TOP STATS ===== */
 
-  document.getElementById("totalOverdue")
-    .innerText = totalOverdue;
+  document.getElementById("totalMembers").innerText =
+    list.length;
 
-  document.getElementById("lowPerformers")
-    .innerText = list.filter(m=>
-      m.total && m.completed/m.total < .6
+  document.getElementById("totalOverdue").innerText =
+    totalOverdue;
+
+  document.getElementById("lowPerformers").innerText =
+    list.filter(m =>
+      m.total && m.completed / m.total < 0.6
     ).length;
 
-  console.log("Due Today:",dueToday);
-  console.log("Long Pending:",longPending);
-
+  console.log("Due Today:", dueToday);
+  console.log("Long Pending:", longPending);
 }
