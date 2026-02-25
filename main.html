@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Projects | HireLens Studio</title>
+  <link rel="stylesheet" href="css/style.css">
+
+  <style>
+    body {
+      background: #0f172a;
+      color: white;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+
+    .container {
+      padding: 40px;
+      max-width: 1100px;
+      margin: auto;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .primary {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .secondary {
+      background: #1e293b;
+      color: white;
+      border: 1px solid #334155;
+    }
+
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .project-card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 12px;
+      transition: 0.3s;
+      cursor: pointer;
+    }
+
+    .project-card:hover {
+      background: #334155;
+      transform: translateY(-4px);
+    }
+
+    .role-badge {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      margin-top: 8px;
+      display: inline-block;
+    }
+
+    .admin {
+      background: #16a34a;
+    }
+
+    .member {
+      background: #6366f1;
+    }
+
+    .empty-state {
+      text-align: center;
+      margin-top: 80px;
+      opacity: 0.7;
+    }
+
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: #1e293b;
+      padding: 30px;
+      border-radius: 12px;
+      width: 350px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    .close {
+      float: right;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="top-bar">
+    <div>
+      <h1>Your Projects</h1>
+      <p>Manage or join a workspace</p>
+    </div>
+
+    <div>
+      <button class="btn secondary" onclick="openJoinModal()">Join Project</button>
+      <button class="btn primary" onclick="createProject()">+ New Project</button>
+    </div>
+  </div>
+
+  <div id="projectsContainer" class="project-grid"></div>
+
+  <div id="emptyState" class="empty-state" style="display:none;">
+    <h2>No Projects Yet</h2>
+    <p>Create or join one to get started</p>
+  </div>
+
+</div>
+
+<!-- Join Modal -->
+<div id="joinModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeJoinModal()">✖</span>
+    <h3>Join Project</h3>
+    <input type="text" id="inviteCode" placeholder="Enter Invite Code">
+    <button class="btn primary" style="margin-top:15px;" onclick="joinProject()">Join</button>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where, addDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
+    authDomain: "hirelens-studio.firebaseapp.com",
+    projectId: "hirelens-studio",
+    storageBucket: "hirelens-studio.firebasestorage.app",
+    messagingSenderId: "274271462149",
+    appId: "1:274271462149:web:6df015d15a7c908a900d6c",
+    measurementId: "G-P3JRC27VCE"
+  };
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser;
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.href = "index.html";
+  } else {
+    currentUser = user;
+    loadProjects();
+  }
+});
+
+async function loadProjects() {
+  const q = query(collection(db, "projects"));
+  const snapshot = await getDocs(q);
+
+  const container = document.getElementById("projectsContainer");
+  container.innerHTML = "";
+
+  let hasProjects = false;
+
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const members = data.members || {};
+
+    if (members[currentUser.uid]) {
+      hasProjects = true;
+
+      const role = members[currentUser.uid];
+
+      container.innerHTML += `
+        <div class="project-card" onclick="openProject('${docSnap.id}')">
+          <h3>${data.name}</h3>
+          <span class="role-badge ${role === "admin" ? "admin" : "member"}">
+            ${role}
+          </span>
+        </div>
+      `;
+    }
+  });
+
+  if (!hasProjects) {
+    document.getElementById("emptyState").style.display = "block";
+  }
+}
+
+window.createProject = async function() {
+  const name = prompt("Enter Project Name:");
+  if (!name) return;
+
+  const inviteCode = Math.random().toString(36).substring(2,8).toUpperCase();
+
+  await addDoc(collection(db, "projects"), {
+    name,
+    createdBy: currentUser.uid,
+    createdAt: new Date(),
+    inviteCode,
+    members: {
+      [currentUser.uid]: "admin"
+    }
+  });
+
+  loadProjects();
+};
+
+window.openProject = function(projectId) {
+  window.location.href = `dashboard.html?project=${projectId}`;
+};
+
+window.openJoinModal = function() {
+  document.getElementById("joinModal").style.display = "flex";
+};
+
+window.closeJoinModal = function() {
+  document.getElementById("joinModal").style.display = "none";
+};
+
+window.joinProject = async function() {
+  const code = document.getElementById("inviteCode").value.trim();
+  if (!code) return;
+
+  const q = query(collection(db, "projects"), where("inviteCode", "==", code));
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    alert("Invalid Invite Code");
+    return;
+  }
+
+  snapshot.forEach(async (docSnap) => {
+    const projectRef = doc(db, "projects", docSnap.id);
+    const data = docSnap.data();
+    const members = data.members || {};
+
+    members[currentUser.uid] = "member";
+
+    await updateDoc(projectRef, { members });
+
+    loadProjects();
+    closeJoinModal();
+  });
+};
+
+</script>
+
+</body>
+</html>

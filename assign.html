@@ -106,6 +106,30 @@ select option[value="high"]{color:#ef4444;}
   transition:.25s;
 }
 
+#subTasksContainer{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-bottom:10px;
+}
+
+.subtask-row{
+  display:flex;
+  gap:6px;
+}
+
+.subtask-row input{
+  flex:1;
+}
+
+.remove-sub{
+  background:#ef4444;
+  border:none;
+  padding:6px 10px;
+  border-radius:6px;
+  color:white;
+  cursor:pointer;
+}
 .toggle-btn:hover{
   transform:translateY(-2px);
   box-shadow:0 8px 20px rgba(0,0,0,.4);
@@ -152,29 +176,34 @@ select option[value="high"]{color:#ef4444;}
 
     <form id="assignForm">
 
-      <label>Task Title</label>
-      <input type="text" id="title" placeholder="Enter task title" required>
+  <label>Main Target Title</label>
+  <input type="text" id="title" placeholder="Enter main target" required>
 
-      <label>Assign To</label>
-      <select id="userDropdown" required>
-        <option value="">Loading users...</option>
-      </select>
+  <label>Sub Targets</label>
+  <div id="subTasksContainer"></div>
 
-      <label>Deadline</label>
-      <input type="date" id="deadline" required>
+  <button type="button" onclick="addSubTask()" class="switch-btn">
+    ➕ Add Sub Target
+  </button>
 
-      <label>Priority</label>
-      <select id="priority">
-        <option value="low">🟢 Low</option>
-        <option value="medium">🟡 Medium</option>
-        <option value="high">🔴 High</option>
-      </select>
+  <label>Assign To</label>
+  <select id="userDropdown" required></select>
 
-      <button type="submit" class="toggle-btn">
-        Assign Task
-      </button>
+  <label>Deadline</label>
+  <input type="date" id="deadline" required>
 
-    </form>
+  <label>Priority</label>
+  <select id="priority">
+    <option value="low">🟢 Low</option>
+    <option value="medium">🟡 Medium</option>
+    <option value="high">🔴 High</option>
+  </select>
+
+  <button type="submit" class="toggle-btn">
+    Assign Target
+  </button>
+
+</form>
 
     <p id="message"></p>
 

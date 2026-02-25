@@ -1,15 +1,15 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { serverTimestamp } from 
-"https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { 
-  getFirestore, 
-  collection, 
-  query, 
-  where, 
-  onSnapshot,
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
   updateDoc,
   doc,
-  getDocs
+  getDoc,
+  onSnapshot,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import {
@@ -18,210 +18,278 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-/* FIREBASE CONFIG */
+/* ================= FIREBASE CONFIG ================= */
 
 const firebaseConfig = {
   apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
   authDomain: "hirelens-studio.firebaseapp.com",
-  projectId: "hirelens-studio",
-  storageBucket: "hirelens-studio.firebasestorage.app",
-  messagingSenderId: "274271462149",
-  appId: "1:274271462149:web:6df015d15a7c908a900d6c",
-  measurementId: "G-P3JRC27VCE"
+  projectId: "hirelens-studio"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-let chartInstance = null;
+/* ================= PROJECT CONTEXT ================= */
 
-/* AUTH CHECK */
+const params = new URLSearchParams(window.location.search);
+const projectId = params.get("project");
+
+if (!projectId) {
+  alert("No project selected");
+  window.location.href = "main.html";
+}
+
+let currentUser;
+let myChart = null;
+let lastLoadedTimestamp = null;
+
+/* ================= AUTH CHECK ================= */
 
 onAuthStateChanged(auth, async (user) => {
+
   if (!user) {
-    window.location.href = "login.html";
+    window.location.href = "index.html";
     return;
   }
 
-  try {
-    // Get user info from "users" collection using email
-    const q = query(
-      collection(db, "users"),
-      where("email", "==", user.email)
-    );
+  currentUser = user;
 
-    const snapshot = await getDocs(q);
+  const projectRef = doc(db, "projects", projectId);
+  const projectSnap = await getDoc(projectRef);
 
-    if (snapshot.empty) {
-      document.getElementById("welcomeText").innerText =
-        `Welcome, ${user.email}`;
-      loadUserTasks(user.email);
+  if (!projectSnap.exists()) {
+    window.location.href = "main.html";
+    return;
+  }
+
+  const projectData = projectSnap.data();
+  const members = projectData.members || {};
+
+  if (!members[currentUser.uid]) {
+    window.location.href = "main.html";
+    return;
+  }
+
+  // Update header
+  document.getElementById("welcomeText").innerText =
+    "My Dashboard - " + projectData.name;
+
+  // Link team dashboard
+  const teamBtn = document.getElementById("TeamBtn");
+  if (teamBtn) {
+    teamBtn.href = `dashboard.html?project=${projectId}`;
+  }
+
+  await loadMyTasks();
+  listenForProjectUpdates();
+});
+
+/* ================= LIGHTWEIGHT PROJECT LISTENER ================= */
+
+function listenForProjectUpdates() {
+
+  const projectRef = doc(db, "projects", projectId);
+
+  onSnapshot(projectRef, (docSnap) => {
+
+    const updated = docSnap.data()?.lastUpdated?.toMillis?.() || null;
+
+    if (!updated) return;
+
+    if (lastLoadedTimestamp === null) {
+      lastLoadedTimestamp = updated;
       return;
     }
 
-    const userData = snapshot.docs[0].data();
-
-    // Show name
-    document.getElementById("welcomeText").innerText =
-      `Welcome, ${userData.name}`;
-
-    loadUserTasks(userData.email);
-
-  } catch (err) {
-    console.error("Error loading user:", err);
-    loadUserTasks(user.email);
-  }
-});
-
-/* LOAD USER TASKS */
-
-function loadUserTasks(userEmail) {
-
-  const q = query(
-    collection(db, "tasks"),
-    where("assignedToEmail", "==", userEmail)
-  );
-
-  onSnapshot(q, (snapshot) => {
-
-    const table = document.getElementById("taskTable");
-    table.innerHTML = "";
-
-    let total = 0;
-    let completed = 0;
-    let pending = 0;
-    let overdue = 0;
-
-    const now = new Date();
-
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const id = docSnap.id;
-
-      const deadline = data.deadline?.toDate();
-      if (!deadline) return;
-
-      total++;
-
-      if (data.status === "completed") completed++;
-      else pending++;
-
-      if (deadline < now && data.status !== "completed")
-        overdue++;
-
-      table.innerHTML += `
-        <tr class="${deadline < now && data.status !== "completed" ? "overdue" : ""}">
-          <td>${data.title}</td>
-          <td>${data.status}</td>
-          <td>${deadline.toLocaleDateString()}</td>
-          <td>
-            <select onchange="updateStatus('${id}', this.value)">
-              <option value="pending" ${data.status==="pending"?"selected":""}>pending</option>
-              <option value="progress" ${data.status==="progress"?"selected":""}>progress</option>
-              <option value="completed" ${data.status==="completed"?"selected":""}>completed</option>
-            </select>
-          </td>
-        </tr>
-      `;
-    });
-
-    const rate = total ? ((completed / total) * 100).toFixed(1) : 0;
-
-    document.getElementById("myTotal").innerText = total;
-    document.getElementById("myCompleted").innerText = completed;
-    document.getElementById("myPending").innerText = pending;
-    document.getElementById("myOverdue").innerText = overdue;
-    document.getElementById("myCompletionRate").innerText = rate + "%";
-
-    updateStatusText(rate);
-    updateChart(completed, pending);
-    revealSections();
+    if (updated !== lastLoadedTimestamp) {
+      lastLoadedTimestamp = updated;
+      loadMyTasks();
+    }
   });
 }
 
-/* UPDATE STATUS */
+/* ================= LOAD USER TASKS ================= */
 
-window.updateStatus = async function (taskId, newStatus) {
+async function loadMyTasks() {
 
-  const taskRef = doc(db, "tasks", taskId);
+  const tasksRef = collection(db, "projects", projectId, "tasks");
+  const q = query(tasksRef, where("assignedTo", "==", currentUser.uid));
+  const snapshot = await getDocs(q);
 
-  if (newStatus === "completed") {
+  let total = 0;
+  let completed = 0;
+  let pending = 0;
+  let overdue = 0;
 
-    await updateDoc(taskRef, {
-      status: newStatus,
-      completedAt: serverTimestamp()
+  const container = document.getElementById("taskContainer");
+  container.innerHTML = "";
+
+  snapshot.forEach(docSnap => {
+
+    const data = docSnap.data();
+    total++;
+
+    const status = data.status || "pending";
+    const deadline = data.deadline || "—";
+    const subTasks = data.subTasks || [];
+
+    if (status === "completed") completed++;
+    else pending++;
+
+    const dueDate = data.deadline ? new Date(data.deadline) : null;
+    if (dueDate && dueDate < new Date() && status !== "completed") {
+      overdue++;
+    }
+
+    const completedSubs = subTasks.filter(s => s.completed).length;
+    const totalSubs = subTasks.length;
+
+    const progress = totalSubs > 0
+      ? Math.round((completedSubs / totalSubs) * 100)
+      : 100;
+
+    const allSubsDone = totalSubs === 0 || completedSubs === totalSubs;
+
+    let subHTML = "";
+
+    subTasks.forEach((sub, index) => {
+      subHTML += `
+        <div class="subtask-item">
+          <input type="checkbox"
+            ${sub.completed ? "checked" : ""}
+            onchange="toggleSubTask('${docSnap.id}', ${index})">
+          ${sub.title}
+        </div>
+      `;
     });
 
-  } else {
+    container.innerHTML += `
+      <div class="task-card">
+        <div class="task-header">
+          <div>
+            <div class="task-title">${data.title}</div>
+            <div class="task-meta">Deadline: ${deadline}</div>
+          </div>
+          <div>${status}</div>
+        </div>
 
-    await updateDoc(taskRef, {
-      status: newStatus,
-      completedAt: null         // remove if reopened
-    });
+        <div class="subtask-list">
+          ${subHTML}
+        </div>
 
-  }
-};
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill"
+            style="width:${progress}%">
+          </div>
+        </div>
 
-/* STATUS MESSAGE */
+        <button class="complete-btn"
+          onclick="markComplete('${docSnap.id}')"
+          ${!allSubsDone ? "disabled" : ""}>
+          Complete Main Task
+        </button>
+      </div>
+    `;
+  });
 
-function updateStatusText(rate) {
-  const status = document.getElementById("myStatusText");
-
-  if (rate >= 85) {
-    status.innerText = "Excellent performance 🔥";
-    status.style.color = "#22c55e";
-  } else if (rate >= 60) {
-    status.innerText = "Good progress. Keep pushing.";
-    status.style.color = "#f59e0b";
-  } else {
-    status.innerText = "Needs improvement.";
-    status.style.color = "#ef4444";
-  }
+  updateStats(total, completed, pending, overdue);
 }
 
-/* CHART */
+/* ================= TOGGLE SUBTASK ================= */
+
+window.toggleSubTask = async function (taskId, index) {
+
+  const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+  const taskSnap = await getDoc(taskRef);
+
+  const data = taskSnap.data();
+  const subTasks = data.subTasks || [];
+
+  subTasks[index].completed = !subTasks[index].completed;
+
+  await updateDoc(taskRef, { subTasks });
+
+  await updateDoc(doc(db, "projects", projectId), {
+    lastUpdated: serverTimestamp()
+  });
+};
+
+/* ================= MAIN COMPLETE ================= */
+
+window.markComplete = async function (taskId) {
+
+  const taskRef = doc(db, "projects", projectId, "tasks", taskId);
+  const taskSnap = await getDoc(taskRef);
+  const data = taskSnap.data();
+
+  const subTasks = data.subTasks || [];
+
+  const allDone = subTasks.every(sub => sub.completed === true);
+
+  if (!allDone && subTasks.length > 0) {
+    alert("Complete all sub tasks first!");
+    return;
+  }
+
+  await updateDoc(taskRef, { status: "completed" });
+
+  await updateDoc(doc(db, "projects", projectId), {
+    lastUpdated: serverTimestamp()
+  });
+};
+
+/* ================= UPDATE STATS ================= */
+
+function updateStats(total, completed, pending, overdue) {
+
+  const completionRate = total
+    ? Math.round((completed / total) * 100)
+    : 0;
+
+  document.getElementById("myTotal").innerText = total;
+  document.getElementById("myCompleted").innerText = completed;
+  document.getElementById("myPending").innerText = pending;
+  document.getElementById("myOverdue").innerText = overdue;
+
+  document.getElementById("myCompletionRate").innerText =
+    completionRate + "%";
+
+  document.getElementById("myStatusText").innerText =
+    completionRate >= 80
+      ? "Excellent performance 🚀"
+      : completionRate >= 50
+      ? "Good progress 👍"
+      : "Needs improvement ⚡";
+
+  updateChart(completed, pending);
+}
+
+/* ================= UPDATE CHART ================= */
 
 function updateChart(completed, pending) {
 
-  if (chartInstance) chartInstance.destroy();
+  if (myChart) myChart.destroy();
 
-  chartInstance = new Chart(
+  myChart = new Chart(
     document.getElementById("myChart"),
     {
       type: "doughnut",
       data: {
         labels: ["Completed", "Pending"],
         datasets: [{
-          data: [completed, pending]
+          data: [completed, pending],
+          backgroundColor: ["#16a34a", "#d97706"]
         }]
-      },
-      options: {
-        maintainAspectRatio: false,   // ⭐ IMPORTANT
-        plugins: {
-          legend: { position: "bottom" }
-        }
       }
     }
   );
 }
 
-
-/* LOGOUT */
+/* ================= LOGOUT ================= */
 
 window.logout = function () {
   signOut(auth).then(() => {
-    window.location.href = "login.html";
+    window.location.href = "index.html";
   });
 };
-
-/* REVEAL ANIMATION */
-
-function revealSections() {
-  const sections = document.querySelectorAll(".reveal-section");
-  sections.forEach((section, index) => {
-    setTimeout(() => {
-      section.classList.add("show");
-    }, index * 300);
-  });
-}

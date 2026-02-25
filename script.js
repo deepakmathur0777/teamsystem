@@ -2,105 +2,195 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import {
   getFirestore,
   collection,
-  onSnapshot,
-  query,
-  orderBy
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/* ===============================
-   FIREBASE CONFIG
-=============================== */
+import {
+  getAuth,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+/* ================= FIREBASE CONFIG ================= */
+
 const firebaseConfig = {
   apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
   authDomain: "hirelens-studio.firebaseapp.com",
-  projectId: "hirelens-studio",
-  storageBucket: "hirelens-studio.firebasestorage.app",
-  messagingSenderId: "274271462149",
-  appId: "1:274271462149:web:6df015d15a7c908a900d6c"
+  projectId: "hirelens-studio"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-/* ===============================
-   VARIABLES
-=============================== */
-let showTodayOnly = false;
-let allTasks = [];
-let mainChartInstance = null;
-let weeklyChartInstance = null;
+/* ================= PROJECT CONTEXT ================= */
 
+const params = new URLSearchParams(window.location.search);
+const projectId = params.get("project");
 
-/* ===============================
-   HELPERS
-=============================== */
-function isToday(date) {
-  const today = new Date();
-  return date.toDateString() === today.toDateString();
+if (!projectId) {
+  alert("No project selected");
+  window.location.href = "main.html";
 }
 
-/* ===============================
-   MAIN DASHBOARD
-=============================== */
-function renderDashboard() {
+let currentUser;
+let currentUserRole;
+let progressChart = null;
+let weeklyChart = null;
+let lastLoadedTimestamp = null;
 
-  const table = document.getElementById("taskTable");
-  table.innerHTML = "";
+/* ================= AUTH CHECK ================= */
+
+onAuthStateChanged(auth, async (user) => {
+
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  currentUser = user;
+
+  const projectRef = doc(db, "projects", projectId);
+  const projectSnap = await getDoc(projectRef);
+
+  if (!projectSnap.exists()) {
+    alert("Project not found");
+    window.location.href = "main.html";
+    return;
+  }
+
+  const projectData = projectSnap.data();
+  const members = projectData.members || {};
+
+  if (!members[currentUser.uid]) {
+    alert("Access denied");
+    window.location.href = "main.html";
+    return;
+  }
+
+  currentUserRole = members[currentUser.uid];
+
+  /* ===== Update Header ===== */
+
+  document.querySelector(".hero h2").innerText =
+    "Team Transparency Dashboard - " + projectData.name;
+
+  /* ===== Link Personal Page ===== */
+
+  const personalBtn = document.getElementById("personalBtn");
+  if (personalBtn) {
+    personalBtn.href = `personal.html?project=${projectId}`;
+  }
+
+  /* ===== Link Assign Page (Admin Only) ===== */
+
+  const assignBtn = document.getElementById("assignBtn");
+  if (assignBtn) {
+    if (currentUserRole === "admin") {
+      assignBtn.href = `assign.html?project=${projectId}`;
+      assignBtn.style.display = "inline-block";
+    } else {
+      assignBtn.style.display = "none";
+    }
+  }
+
+  loadMembers(members);
+  await loadTasks();   // Initial load
+  listenForProjectUpdates();  // Lightweight listener
+});
+
+/* ================= LIGHTWEIGHT PROJECT LISTENER ================= */
+
+function listenForProjectUpdates() {
+
+  const projectRef = doc(db, "projects", projectId);
+
+  onSnapshot(projectRef, (docSnap) => {
+
+    const data = docSnap.data();
+    const updated = data?.lastUpdated?.toMillis?.() || null;
+
+    if (!updated) return;
+
+    if (lastLoadedTimestamp === null) {
+      lastLoadedTimestamp = updated;
+      return;
+    }
+
+    if (updated !== lastLoadedTimestamp) {
+      lastLoadedTimestamp = updated;
+      loadTasks();
+    }
+  });
+}
+
+/* ================= LOAD TASKS ================= */
+
+async function loadTasks() {
+
+  const tasksRef = collection(db, "projects", projectId, "tasks");
+  const snapshot = await getDocs(tasksRef);
 
   let total = 0;
   let completed = 0;
   let pending = 0;
   let overdue = 0;
-  let memberData = {};
-  let weeklyData = {};
-  const now = new Date();
 
-  const filtered = showTodayOnly
-    ? allTasks.filter(t =>
-        t.deadline?.toDate() && isToday(t.deadline.toDate())
-      )
-    : allTasks;
+  const weeklyData = [0,0,0,0,0,0,0];
 
-  filtered.forEach(task => {
+  const table = document.getElementById("taskTable");
+  table.innerHTML = "";
 
-    const deadline = task.deadline?.toDate();
-    if (!deadline) return;
+  snapshot.forEach(docSnap => {
 
+    const data = docSnap.data();
     total++;
 
-    if (!memberData[task.assignedTo])
-      memberData[task.assignedTo] = { total: 0, completed: 0 };
+    const status = data.status || "pending";
+    const createdAt = data.createdAt?.toDate?.() || null;
+    const dueDate = data.deadline ? new Date(data.deadline) : null;
 
-    memberData[task.assignedTo].total++;
+    if (status === "completed") completed++;
+    else pending++;
 
-    if (task.status === "completed") {
-      completed++;
-      memberData[task.assignedTo].completed++;
+    if (dueDate && dueDate < new Date() && status !== "completed") {
+      overdue++;
+    }
 
-      const label = deadline.toLocaleDateString();
-      weeklyData[label] = (weeklyData[label] || 0) + 1;
-
-    } else {
-      pending++;
-      if (deadline < now) overdue++;
+    if (createdAt) {
+      weeklyData[createdAt.getDay()]++;
     }
 
     table.innerHTML += `
-      <tr class="${deadline < now && task.status !== "completed" ? "overdue" : ""}">
-        <td>${task.title || "-"}</td>
-        <td>${task.assignedTo || "-"}</td>
-        <td>${task.status || "-"}</td>
-        <td>${deadline.toLocaleDateString()}</td>
+      <tr>
+        <td>${data.title}</td>
+        <td>${data.assignedTo || "—"}</td>
+        <td>
+          <span class="badge ${status === "completed" ? "completed" : "pending"}">
+            ${status}
+          </span>
+        </td>
       </tr>
     `;
   });
 
+  updateStats(total, completed, pending, overdue);
+  updateCharts(completed, pending, weeklyData);
+}
+
+/* ================= UPDATE STATS ================= */
+
+function updateStats(total, completed, pending, overdue) {
+
   const completionRate = total
-    ? ((completed / total) * 100).toFixed(1)
+    ? Math.round((completed / total) * 100)
     : 0;
 
-  const efficiency = total
-    ? (((completed - overdue) / total) * 100).toFixed(1)
+  const efficiencyRate = (completed + pending)
+    ? Math.round((completed / (completed + pending)) * 100)
     : 0;
 
   document.getElementById("totalTasks").innerText = total;
@@ -108,104 +198,76 @@ function renderDashboard() {
   document.getElementById("pendingTasks").innerText = pending;
   document.getElementById("overdueTasks").innerText = overdue;
   document.getElementById("completionRate").innerText = completionRate + "%";
-  document.getElementById("efficiencyRate").innerText = efficiency + "%";
+  document.getElementById("efficiencyRate").innerText = efficiencyRate + "%";
   document.getElementById("progressBar").style.width = completionRate + "%";
-
-  renderMembers(memberData);
-  updateCharts(completed, pending, weeklyData);
 }
 
-/* ===============================
-   MEMBERS
-=============================== */
-function renderMembers(data) {
-  const container = document.getElementById("memberStats");
-  container.innerHTML = "";
+/* ================= LOAD MEMBERS ================= */
 
-  Object.keys(data).forEach(member => {
+function loadMembers(members) {
 
-    const m = data[member];
+  const memberStats = document.getElementById("memberStats");
+  memberStats.innerHTML = "";
 
-    container.innerHTML += `
+  Object.entries(members).forEach(([uid, role]) => {
+
+    memberStats.innerHTML += `
       <div class="member-card" onclick="toggleMember(this)">
-        <strong>${member}</strong>
-        (${m.completed}/${m.total})
+        <strong>${uid}</strong>
+        <span class="badge ${role === "admin" ? "completed" : "pending"}">
+          ${role}
+        </span>
         <div class="member-tasks">
-          ${
-            allTasks
-              .filter(t => t.assignedTo === member)
-              .map(t => `
-                <div>
-                  ${t.title}
-                  <span class="badge ${t.status}">
-                    ${t.status}
-                  </span>
-                </div>
-              `).join("")
-          }
+          Role: ${role}
         </div>
       </div>
     `;
   });
 }
 
-/* ===============================
-   CHARTS
-=============================== */
+/* ================= CHARTS ================= */
+
 function updateCharts(completed, pending, weeklyData) {
 
-  if (mainChartInstance) mainChartInstance.destroy();
-  mainChartInstance = new Chart(
+  if (progressChart) progressChart.destroy();
+  if (weeklyChart) weeklyChart.destroy();
+
+  progressChart = new Chart(
     document.getElementById("progressChart"),
     {
       type: "doughnut",
       data: {
         labels: ["Completed", "Pending"],
-        datasets: [{ data: [completed, pending] }]
-      },
-      options: {
-        maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom" } }
+        datasets: [{
+          data: [completed, pending]
+        }]
       }
     }
   );
 
-  if (weeklyChartInstance) weeklyChartInstance.destroy();
-  weeklyChartInstance = new Chart(
+  weeklyChart = new Chart(
     document.getElementById("weeklyChart"),
     {
-      type: "line",
+      type: "bar",
       data: {
-        labels: Object.keys(weeklyData),
+        labels: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
         datasets: [{
-          label: "Completed",
-          data: Object.values(weeklyData),
-          tension: 0.3
+          label: "Tasks Created",
+          data: weeklyData
         }]
-      },
-      options: { maintainAspectRatio: false }
+      }
     }
   );
 }
 
-/* ===============================
-   FIRESTORE LISTENER
-=============================== */
-const q = query(collection(db, "tasks"), orderBy("deadline"));
+/* ================= UTILITIES ================= */
 
-onSnapshot(q, snapshot => {
+window.toggleMember = function(el) {
+  el.classList.toggle("open");
+};
 
-  allTasks = [];
-  snapshot.forEach(doc => allTasks.push(doc.data()));
-
-  renderDashboard();
-
-  // ⭐ IMPORTANT → hide loader
-  document.getElementById("loader").style.display = "none";
-  document.getElementById("dashboardContent").classList.remove("hidden");
-
-}, error => {
-  console.error("Firestore error:", error);
-  document.getElementById("loader").innerText =
-    "Error loading data. Check console.";
-});
+window.logout = function () {
+  signOut(auth).then(() => {
+    window.location.href = "index.html";
+  });
+};

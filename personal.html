@@ -13,7 +13,8 @@ body{
   color:#e5e7eb;
 }
 
-/* ===== GLOBAL ===== */
+/* ===== LAYOUT ===== */
+
 .container{
   padding:20px;
   max-width:1400px;
@@ -24,6 +25,7 @@ body{
 }
 
 /* ===== HEADER ===== */
+
 .top-bar{
   grid-column:1/span 2;
   background:linear-gradient(135deg,#0d1b3a,#1e3a8a);
@@ -37,11 +39,9 @@ body{
 
 .top-bar h2{
   font-weight:600;
-  letter-spacing:.4px;
 }
 
-/* BUTTONS */
-.switch-btn, .toggle-btn{
+.switch-btn,.toggle-btn{
   background:linear-gradient(135deg,#3b82f6,#2563eb);
   border:none;
   padding:6px 14px;
@@ -53,6 +53,7 @@ body{
   margin-left:10px;
   transition:.25s;
 }
+
 .switch-btn:hover,
 .toggle-btn:hover{
   transform:translateY(-2px);
@@ -60,6 +61,7 @@ body{
 }
 
 /* ===== HERO ===== */
+
 .hero{
   grid-column:1/span 2;
   background:#0d1b3a;
@@ -76,12 +78,14 @@ body{
   font-weight:600;
   color:#22c55e;
 }
+
 .hero-status{
   font-size:13px;
   opacity:.75;
 }
 
 /* ===== STATS ===== */
+
 .stats{
   grid-column:1/span 2;
   display:grid;
@@ -94,8 +98,8 @@ body{
   padding:14px;
   border-radius:14px;
   text-align:center;
-  transition:.25s;
   box-shadow:0 4px 16px rgba(0,0,0,.3);
+  transition:.25s;
 }
 
 .card:hover{
@@ -106,43 +110,103 @@ body{
   color:#38bdf8;
   font-size:24px;
 }
+
 .card p{
   opacity:.7;
   font-size:12px;
 }
 
-/* ===== TABLE ===== */
+/* ===== TASK SECTION ===== */
+
 .table-section{
   background:#0d1b3a;
   border-radius:14px;
   padding:14px;
-  overflow:auto;
-  max-height:70vh;
   box-shadow:0 6px 20px rgba(0,0,0,.35);
 }
 
-table{
-  width:100%;
-  border-collapse:collapse;
-  font-size:13px;
+.section-title{
+  margin-bottom:10px;
+  font-weight:600;
+  opacity:.9;
 }
 
-th{
-  background:#162447;
-  padding:10px;
-  text-align:left;
+/* ===== TASK CARD ===== */
+
+.task-card{
+  background:#07122a;
+  padding:14px;
+  border-radius:12px;
+  margin-bottom:12px;
+  transition:.25s;
 }
 
-td{
-  padding:10px;
-  border-bottom:1px solid #162447;
-}
-
-tr:hover{
+.task-card:hover{
   background:#14213d;
 }
 
+.task-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.task-title{
+  font-weight:600;
+}
+
+.task-meta{
+  font-size:12px;
+  opacity:.7;
+}
+
+.subtask-list{
+  margin-top:10px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.subtask-item{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:13px;
+}
+
+.progress-bar-container{
+  background:#1e293b;
+  height:6px;
+  border-radius:6px;
+  margin-top:8px;
+  overflow:hidden;
+}
+
+.progress-bar-fill{
+  height:100%;
+  background:linear-gradient(90deg,#22c55e,#06b6d4);
+  width:0%;
+  transition:.3s;
+}
+
+.complete-btn{
+  margin-top:10px;
+  padding:6px 12px;
+  font-size:12px;
+  border:none;
+  border-radius:6px;
+  background:#3b82f6;
+  color:white;
+  cursor:pointer;
+}
+
+.complete-btn:disabled{
+  background:#475569;
+  cursor:not-allowed;
+}
+
 /* ===== SIDE ===== */
+
 .side{
   display:flex;
   flex-direction:column;
@@ -160,11 +224,12 @@ tr:hover{
   height:180px !important;
 }
 
-/* ===== SMALL DETAILS ===== */
-.section-title{
-  margin-bottom:8px;
-  font-weight:600;
-  opacity:.9;
+/* ===== MOBILE ===== */
+
+@media(max-width:900px){
+  .container{
+    grid-template-columns:1fr;
+  }
 }
 </style>
 </head>
@@ -177,7 +242,7 @@ tr:hover{
 <div class="top-bar">
   <h2 id="welcomeText">My Dashboard</h2>
   <div>
-    <a href="dashboard.html" class="switch-btn">👥 Team Dashboard</a>
+    <a id="TeamBtn" class="switch-btn">👥 Team Dashboard</a>
     <button onclick="logout()" class="toggle-btn">Logout</button>
   </div>
 </div>
@@ -202,34 +267,23 @@ tr:hover{
   <div class="card"><h2 id="myOverdue">0</h2><p>Overdue</p></div>
 </div>
 
-<!-- TABLE -->
+<!-- TASKS -->
 <div class="table-section">
   <div class="section-title">My Tasks</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Status</th>
-        <th>Deadline</th>
-        <th>Update</th>
-      </tr>
-    </thead>
-    <tbody id="taskTable"></tbody>
-  </table>
+  <div id="taskContainer"></div>
 </div>
 
 <!-- SIDE -->
 <div class="side">
-
   <div class="chart-card">
     <div class="section-title">My Progress</div>
     <canvas id="myChart"></canvas>
   </div>
-
 </div>
 
 </div>
 
 <script type="module" src="personal.js"></script>
+
 </body>
 </html>

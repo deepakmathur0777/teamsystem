@@ -235,4 +235,3 @@ function renderAdmin(members, totalOverdue, dueToday, longPending) {
   console.log("Due Today:", dueToday);
   console.log("Long Pending:", longPending);
 }
-
