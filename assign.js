@@ -22,16 +22,6 @@ const firebaseConfig = {
   projectId: "hirelens-studio"
 };
 
-const teamBtn = document.getElementById("TeamBtn");
-  if (teamBtn) {
-    teamBtn.href = `dashboard.html?project=${projectId}`;
-  }
-
-const persnlBtn = document.getElementById("PersnlBtn");
-  if (persnlBtn) {
-    persnlBtn.href = `personal.html?project=${projectId}`;
-  }
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -198,4 +188,3 @@ document.getElementById("assignForm")
       "❌ Failed to assign task";
   }
 });
-

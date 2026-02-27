@@ -4,7 +4,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
-  GoogleAuthProvider
+  GoogleAuthProvider,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 import {
@@ -28,15 +29,15 @@ const db = getFirestore(app);
 
 const provider = new GoogleAuthProvider();
 
-/* ================= EMAIL REGISTER ================= */
+/* ================= REGISTER ================= */
 
 document.getElementById("registerForm")
-.addEventListener("submit", async (e) => {
+?.addEventListener("submit", async (e) => {
 
   e.preventDefault();
 
-  const name = document.getElementById("registerName").value;
-  const email = document.getElementById("registerEmail").value;
+  const name = document.getElementById("registerName").value.trim();
+  const email = document.getElementById("registerEmail").value.trim();
   const password = document.getElementById("registerPassword").value;
 
   const userCred = await createUserWithEmailAndPassword(auth, email, password);
@@ -46,32 +47,31 @@ document.getElementById("registerForm")
     email
   });
 
-  localStorage.setItem("userName", name);
+  // Clear any previous stored data
+  localStorage.clear();
+
   window.location.href="main.html";
 });
 
-/* ================= EMAIL LOGIN ================= */
+/* ================= LOGIN ================= */
 
 document.getElementById("loginForm")
-.addEventListener("submit", async (e) => {
+?.addEventListener("submit", async (e) => {
 
   e.preventDefault();
 
-  const email = document.getElementById("loginEmail").value;
+  const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value;
 
-  const userCred = await signInWithEmailAndPassword(auth,email,password);
+  await signInWithEmailAndPassword(auth,email,password);
 
-  const userDoc = await getDoc(doc(db,"users",userCred.user.uid));
-
-  if(userDoc.exists()){
-    localStorage.setItem("userName",userDoc.data().name);
-  }
+  // Clear stale local data
+  localStorage.clear();
 
   window.location.href="main.html";
 });
 
-/* ================= GOOGLE LOGIN / REGISTER ================= */
+/* ================= GOOGLE ================= */
 
 async function handleGoogle(){
 
@@ -82,19 +82,29 @@ async function handleGoogle(){
   const userDoc = await getDoc(userRef);
 
   if(!userDoc.exists()){
-    // Ask for name if not exists
-    const name = prompt("Enter your full name:");
+    const name = prompt("Enter your full name:") 
+      || user.displayName 
+      || "User";
+
     await setDoc(userRef,{
-      name: name || user.displayName || "User",
+      name,
       email: user.email
     });
-    localStorage.setItem("userName", name || user.displayName);
-  }else{
-    localStorage.setItem("userName",userDoc.data().name);
   }
+
+  localStorage.clear();
 
   window.location.href="main.html";
 }
 
-document.getElementById("googleLogin").addEventListener("click",handleGoogle);
-document.getElementById("googleRegister").addEventListener("click",handleGoogle);
+document.getElementById("googleLogin")?.addEventListener("click",handleGoogle);
+document.getElementById("googleRegister")?.addEventListener("click",handleGoogle);
+
+/* ================= LOGOUT (OPTIONAL GLOBAL USE) ================= */
+
+window.logout = function(){
+  signOut(auth).then(()=>{
+    localStorage.clear();
+    window.location.href="index.html";
+  });
+};
