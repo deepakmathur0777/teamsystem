@@ -1,179 +1,251 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Admin Control Panel</title>
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  updateDoc,
+  collection,
+  getDocs,
+  deleteDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
+import {
+  getAuth,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-body{
-  font-family:Inter,Segoe UI,sans-serif;
-  background:radial-gradient(circle at top,#1e3a8a,#07122a);
-  color:#e5e7eb;
-  min-height:100vh;
+/* CONFIG */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
+  authDomain: "hirelens-studio.firebaseapp.com",
+  projectId: "hirelens-studio"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const params = new URLSearchParams(window.location.search);
+const projectId = params.get("project");
+
+if (!projectId) {
+  window.location.href = "main.html";
 }
 
-/* ===== CONTAINER ===== */
-.container{
-  max-width:1400px;
-  margin:auto;
-  padding:25px;
+let currentUser;
+let membersData = {};
+
+/* ================= AUTH ================= */
+
+onAuthStateChanged(auth, async (user) => {
+
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  currentUser = user;
+
+  const projectSnap = await getDoc(doc(db, "projects", projectId));
+
+  if (!projectSnap.exists()) {
+    window.location.href = "main.html";
+    return;
+  }
+
+  membersData = projectSnap.data().members || {};
+
+  if (!membersData[currentUser.uid] ||
+      membersData[currentUser.uid].role !== "admin") {
+    alert("Admin access only");
+    window.location.href = `dashboard.html?project=${projectId}`;
+    return;
+  }
+
+  loadMembers();
+  loadTasks();
+});
+
+/* ================= MEMBER MANAGEMENT ================= */
+
+function getAdminCount() {
+  return Object.values(membersData)
+    .filter(m => m.role === "admin").length;
 }
 
-/* ===== HERO ===== */
-.hero{
-  background:linear-gradient(135deg,#0d1b3a,#1e3a8a);
-  padding:22px 26px;
-  border-radius:18px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  box-shadow:0 15px 40px rgba(0,0,0,.5);
-  margin-bottom:25px;
+function loadMembers() {
+
+  const container = document.getElementById("membersContainer");
+  container.innerHTML = "";
+
+  Object.entries(membersData).forEach(([uid, data]) => {
+
+    container.innerHTML += `
+      <div style="margin-bottom:10px;">
+        <strong>${data.name}</strong> (${data.role})
+        ${uid !== currentUser.uid ? `
+          <button onclick="changeRole('${uid}','admin')">Promote</button>
+          <button onclick="changeRole('${uid}','member')">Demote</button>
+          <button onclick="removeMember('${uid}')">Remove</button>
+        ` : "(You)"}
+      </div>
+    `;
+  });
 }
 
-.hero h1{font-size:26px;}
-.hero-sub{opacity:.75;margin-top:6px;}
+window.changeRole = async function(uid, newRole){
 
-.switch-btn{
-  background:linear-gradient(135deg,#3b82f6,#2563eb);
-  color:white;
-  padding:6px 14px;
-  border-radius:8px;
-  text-decoration:none;
-  font-size:13px;
-  margin-left:10px;
+  if (membersData[uid].role === "admin" &&
+      newRole === "member" &&
+      getAdminCount() === 1) {
+    alert("Cannot demote the last admin.");
+    return;
+  }
+
+  membersData[uid].role = newRole;
+
+  await updateDoc(doc(db,"projects",projectId),{
+    members: membersData,
+    lastUpdated: serverTimestamp()
+  });
+
+  loadMembers();
+};
+
+window.removeMember = async function(uid){
+
+  if (membersData[uid].role === "admin" &&
+      getAdminCount() === 1) {
+    alert("Cannot remove the last admin.");
+    return;
+  }
+
+  delete membersData[uid];
+
+  await updateDoc(doc(db,"projects",projectId),{
+    members: membersData,
+    lastUpdated: serverTimestamp()
+  });
+
+  loadMembers();
+};
+
+/* ================= TASK MANAGEMENT ================= */
+
+async function loadTasks(){
+
+  const snapshot = await getDocs(
+    collection(db,"projects",projectId,"tasks")
+  );
+
+  const container = document.getElementById("tasksContainer");
+  container.innerHTML = "";
+
+  snapshot.forEach(docSnap => {
+
+    const data = docSnap.data();
+
+    container.innerHTML += `
+      <tr>
+        <td>
+          <input value="${data.title}"
+            onchange="editTask('${docSnap.id}','title',this.value)">
+        </td>
+
+        <td>
+          <select onchange="changeAssignee('${docSnap.id}',this.value)">
+            ${generateAssigneeOptions(data.assignedTo)}
+          </select>
+        </td>
+
+        <td>
+          <select onchange="editTask('${docSnap.id}','priority',this.value)">
+            ${generatePriorityOptions(data.priority)}
+          </select>
+        </td>
+
+        <td>
+          <input type="date"
+            value="${data.deadline || ''}"
+            onchange="editTask('${docSnap.id}','deadline',this.value)">
+        </td>
+
+        <td>
+          <button onclick="deleteTask('${docSnap.id}')">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  });
 }
 
-/* ===== STATS ===== */
-.stats{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-  gap:16px;
-  margin-bottom:25px;
+function generateAssigneeOptions(selectedUid) {
+  let options = "";
+  Object.entries(membersData).forEach(([uid,data])=>{
+    options += `
+      <option value="${uid}"
+        ${uid === selectedUid ? "selected" : ""}>
+        ${data.name}
+      </option>
+    `;
+  });
+  return options;
 }
 
-.card{
-  background:#0d1b3a;
-  padding:18px;
-  border-radius:16px;
-  text-align:center;
-  box-shadow:0 8px 25px rgba(0,0,0,.4);
-  transition:.25s;
-}
-.card:hover{transform:translateY(-4px);}
-
-.card h2{
-  color:#38bdf8;
-  font-size:28px;
-}
-.card p{
-  opacity:.7;
-  font-size:13px;
+function generatePriorityOptions(selectedPriority){
+  const priorities = ["low","medium","high"];
+  return priorities.map(p=>`
+    <option value="${p}"
+      ${p === selectedPriority ? "selected" : ""}>
+      ${p}
+    </option>
+  `).join("");
 }
 
-/* ===== SECTION ===== */
-.section-title{
-  font-size:20px;
-  margin:25px 0 12px;
-}
+window.editTask = async function(taskId, field, value){
 
-/* ===== MEMBER GRID ===== */
-#memberOverview{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
-  gap:14px;
-}
+  await updateDoc(
+    doc(db,"projects",projectId,"tasks",taskId),
+    { [field]: value }
+  );
 
-.member-card{
-  background:#0d1b3a;
-  padding:14px;
-  border-radius:14px;
-  box-shadow:0 6px 18px rgba(0,0,0,.35);
-}
+  await updateDoc(
+    doc(db,"projects",projectId),
+    { lastUpdated: serverTimestamp() }
+  );
+};
 
-.member-card h3{margin-bottom:6px;}
+window.changeAssignee = async function(taskId, newUid){
 
-.good{color:#22c55e;}
-.medium{color:#f59e0b;}
-.bad{color:#ef4444;}
+  const newName = membersData[newUid].name;
 
-/* ===== LEADERBOARD ===== */
-#leaderboard{
-  display:flex;
-  gap:14px;
-  margin-bottom:20px;
-}
+  await updateDoc(
+    doc(db,"projects",projectId,"tasks",taskId),
+    {
+      assignedTo: newUid,
+      assignedToName: newName
+    }
+  );
 
-.leader-card{
-  flex:1;
-  background:#0d1b3a;
-  padding:14px;
-  border-radius:14px;
-  text-align:center;
-  box-shadow:0 6px 18px rgba(0,0,0,.35);
-}
-</style>
-</head>
+  await updateDoc(
+    doc(db,"projects",projectId),
+    { lastUpdated: serverTimestamp() }
+  );
+};
 
-<body>
+window.deleteTask = async function(taskId){
 
-<div class="container">
+  await deleteDoc(
+    doc(db,"projects",projectId,"tasks",taskId)
+  );
 
-<!-- HERO -->
-<div class="hero">
-  <div>
-    <h1>🛠 Admin Control Panel</h1>
-    <p class="hero-sub">
-      Monitor team productivity and task performance
-    </p>
-  </div>
+  await updateDoc(
+    doc(db,"projects",projectId),
+    { lastUpdated: serverTimestamp() }
+  );
 
-  <div>
-    <a href="dashboard.html" class="switch-btn">👥 Team</a>
-    <a href="assign.html" class="switch-btn">📋 Assign</a>
-    <a href="personal.html" class="switch-btn">👤 Personal</a>
-  </div>
-</div>
-
-<!-- STATS -->
-<div class="stats">
-  <div class="card">
-    <h2 id="totalMembers">0</h2>
-    <p>Total Members</p>
-  </div>
-
-  <div class="card">
-    <h2 id="totalOverdue">0</h2>
-    <p>Total Overdue Tasks</p>
-  </div>
-
-  <div class="card">
-    <h2 id="lowPerformers">0</h2>
-    <p>Needs Attention</p>
-  </div>
-
-  <div class="card">
-    <h2 id="dueToday">0</h2>
-    <p>Tasks Due Today</p>
-  </div>
-
-  <div class="card">
-    <h2 id="longPending">0</h2>
-    <p>Long Pending Tasks</p>
-  </div>
-</div>
-
-<!-- LEADERBOARD -->
-<h2 class="section-title">🥇 Top Performers</h2>
-<div id="leaderboard"></div>
-
-<!-- MEMBERS -->
-<h2 class="section-title">Member Work Status</h2>
-<div id="memberOverview"></div>
-
-</div>
-
-<script type="module" src="admin.js"></script>
-</body>
-</html>
+  loadTasks();
+};
