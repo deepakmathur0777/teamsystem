@@ -1,13 +1,13 @@
-/* ================= FIREBASE IMPORTS ================= */
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-
 import {
   getFirestore,
+  doc,
+  getDoc,
+  updateDoc,
   collection,
   getDocs,
-  query,
-  where
+  deleteDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import {
@@ -15,223 +15,237 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-/* ================= FIREBASE CONFIG ================= */
+/* CONFIG */
 
 const firebaseConfig = {
-    apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
-    authDomain: "hirelens-studio.firebaseapp.com",
-    projectId: "hirelens-studio",
-    storageBucket: "hirelens-studio.firebasestorage.app",
-    messagingSenderId: "274271462149",
-    appId: "1:274271462149:web:6df015d15a7c908a900d6c",
-    measurementId: "G-P3JRC27VCE"
-  };
+  apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
+  authDomain: "hirelens-studio.firebaseapp.com",
+  projectId: "hirelens-studio"
+};
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-/* ================= AUTH CHECK ================= */
+const params = new URLSearchParams(window.location.search);
+const projectId = params.get("project");
+
+if (!projectId) {
+  window.location.href = "main.html";
+}
+
+let currentUser;
+let membersData = {};
+
+/* ================= AUTH ================= */
 
 onAuthStateChanged(auth, async (user) => {
+
   if (!user) {
-    window.location.href = "login.html";
+    window.location.href = "index.html";
     return;
   }
-  await checkAdmin(user);
+
+  currentUser = user;
+
+  const projectSnap = await getDoc(doc(db, "projects", projectId));
+
+  if (!projectSnap.exists()) {
+    window.location.href = "main.html";
+    return;
+  }
+
+  membersData = projectSnap.data().members || {};
+
+  if (!membersData[currentUser.uid] ||
+      membersData[currentUser.uid].role !== "admin") {
+    alert("Admin access only");
+    window.location.href = `dashboard.html?project=${projectId}`;
+    return;
+  }
+
+  loadMembers();
+  loadTasks();
 });
 
-/* ================= ADMIN CHECK (EMAIL LOCKED) ================= */
+/* ================= MEMBER MANAGEMENT ================= */
 
-async function checkAdmin(user) {
-
-  const email = user.email?.trim().toLowerCase();
-
-  const q = query(
-    collection(db, "users"),
-    where("email", "==", email)
-  );
-
-  const snap = await getDocs(q);
-
-  if (snap.empty) {
-    alert("User not found in database");
-    window.location.href = "personal.html";
-    return;
-  }
-
-  const data = snap.docs[0].data();
-
-  if (!data.role || data.role.toLowerCase() !== "admin") {
-    alert("Access Denied: Admin Only");
-    window.location.href = "personal.html";
-    return;
-  }
-
-  console.log("Admin verified:", email);
-  loadAdminData();
+function getAdminCount() {
+  return Object.values(membersData)
+    .filter(m => m.role === "admin").length;
 }
 
-/* ================= LOAD ADMIN DATA ================= */
+function loadMembers() {
 
-async function loadAdminData() {
-
-  const usersSnap = await getDocs(collection(db, "users"));
-  const tasksSnap = await getDocs(collection(db, "tasks"));
-
-  const members = {};
-  const now = new Date();
-
-  let totalOverdue = 0;
-  let dueToday = 0;
-  let longPending = 0;
-
-  /* ===== INIT MEMBERS ===== */
-
-  usersSnap.forEach(doc => {
-    const u = doc.data();
-
-    if (u.role && u.role.toLowerCase() === "member") {
-      members[u.email.toLowerCase()] = {
-        name: u.name,
-        total: 0,
-        completed: 0,
-        pending: 0,
-        overdue: 0,
-        onTime: 0,
-        late: 0,
-        totalDelay: 0,
-        delayCount: 0
-      };
-    }
-  });
-
-  /* ===== PROCESS TASKS ===== */
-
-  tasksSnap.forEach(doc => {
-
-    const t = doc.data();
-    const deadline = t.deadline?.toDate?.();
-    if (!deadline) return;
-
-    const assignedEmail = t.assignedToEmail?.toLowerCase();
-    const member = members[assignedEmail];
-    if (!member) return;
-
-    member.total++;
-
-    const isToday =
-      deadline.toDateString() === now.toDateString();
-
-    if (isToday) dueToday++;
-
-    if (t.status === "completed") {
-
-      member.completed++;
-
-      if (t.completedAt) {
-
-        const done =
-          t.completedAt.toDate
-            ? t.completedAt.toDate()
-            : new Date(t.completedAt);
-
-        if (done <= deadline) {
-          member.onTime++;
-        } else {
-          member.late++;
-
-          const delay =
-            (done - deadline) / (1000 * 60 * 60 * 24);
-
-          member.totalDelay += delay;
-          member.delayCount++;
-        }
-      }
-
-    } else {
-
-      member.pending++;
-
-      if (deadline < now) {
-        member.overdue++;
-        totalOverdue++;
-
-        const days =
-          (now - deadline) / (1000 * 60 * 60 * 24);
-
-        if (days > 5) longPending++;
-      }
-    }
-  });
-
-  renderAdmin(members, totalOverdue, dueToday, longPending);
-}
-
-/* ================= RENDER DASHBOARD ================= */
-
-function renderAdmin(members, totalOverdue, dueToday, longPending) {
-
-  const container = document.getElementById("memberOverview");
+  const container = document.getElementById("membersContainer");
   container.innerHTML = "";
 
-  const list = Object.values(members);
-
-  /* ===== LEADERBOARD ===== */
-
-  const top =
-    [...list]
-      .sort((a, b) =>
-        (b.completed / b.total || 0) -
-        (a.completed / a.total || 0)
-      )
-      .slice(0, 3);
-
-  console.log("Top Performers:", top);
-
-  /* ===== MEMBER CARDS ===== */
-
-  list.forEach(m => {
-
-    const rate =
-      m.total
-        ? ((m.completed / m.total) * 100).toFixed(1)
-        : 0;
-
-    const avgDelay =
-      m.delayCount
-        ? (m.totalDelay / m.delayCount).toFixed(1)
-        : 0;
+  Object.entries(membersData).forEach(([uid, data]) => {
 
     container.innerHTML += `
-      <div class="member-card">
-        <h3>${m.name}</h3>
-
-        <p>Total: ${m.total}</p>
-        <p>Completed: ${m.completed}</p>
-        <p>✔ On Time: ${m.onTime}</p>
-        <p>⏰ Late: ${m.late}</p>
-        <p>Pending: ${m.pending}</p>
-        <p>Overdue: ${m.overdue}</p>
-
-        <p>Completion: ${rate}%</p>
-        <p>Avg Delay: ${avgDelay} days</p>
+      <div style="margin-bottom:10px;">
+        <strong>${data.name}</strong> (${data.role})
+        ${uid !== currentUser.uid ? `
+          <button onclick="changeRole('${uid}','admin')">Promote</button>
+          <button onclick="changeRole('${uid}','member')">Demote</button>
+          <button onclick="removeMember('${uid}')">Remove</button>
+        ` : "(You)"}
       </div>
     `;
   });
-
-  /* ===== TOP STATS ===== */
-
-  document.getElementById("totalMembers").innerText =
-    list.length;
-
-  document.getElementById("totalOverdue").innerText =
-    totalOverdue;
-
-  document.getElementById("lowPerformers").innerText =
-    list.filter(m =>
-      m.total && m.completed / m.total < 0.6
-    ).length;
-
-  console.log("Due Today:", dueToday);
-  console.log("Long Pending:", longPending);
 }
+
+window.changeRole = async function(uid, newRole){
+
+  if (membersData[uid].role === "admin" &&
+      newRole === "member" &&
+      getAdminCount() === 1) {
+    alert("Cannot demote the last admin.");
+    return;
+  }
+
+  membersData[uid].role = newRole;
+
+  await updateDoc(doc(db,"projects",projectId),{
+    members: membersData,
+    lastUpdated: serverTimestamp()
+  });
+
+  loadMembers();
+};
+
+window.removeMember = async function(uid){
+
+  if (membersData[uid].role === "admin" &&
+      getAdminCount() === 1) {
+    alert("Cannot remove the last admin.");
+    return;
+  }
+
+  delete membersData[uid];
+
+  await updateDoc(doc(db,"projects",projectId),{
+    members: membersData,
+    lastUpdated: serverTimestamp()
+  });
+
+  loadMembers();
+};
+
+/* ================= TASK MANAGEMENT ================= */
+
+async function loadTasks(){
+
+  const snapshot = await getDocs(
+    collection(db,"projects",projectId,"tasks")
+  );
+
+  const container = document.getElementById("tasksContainer");
+  container.innerHTML = "";
+
+  snapshot.forEach(docSnap => {
+
+    const data = docSnap.data();
+
+    container.innerHTML += `
+      <tr>
+        <td>
+          <input value="${data.title}"
+            onchange="editTask('${docSnap.id}','title',this.value)">
+        </td>
+
+        <td>
+          <select onchange="changeAssignee('${docSnap.id}',this.value)">
+            ${generateAssigneeOptions(data.assignedTo)}
+          </select>
+        </td>
+
+        <td>
+          <select onchange="editTask('${docSnap.id}','priority',this.value)">
+            ${generatePriorityOptions(data.priority)}
+          </select>
+        </td>
+
+        <td>
+          <input type="date"
+            value="${data.deadline || ''}"
+            onchange="editTask('${docSnap.id}','deadline',this.value)">
+        </td>
+
+        <td>
+          <button onclick="deleteTask('${docSnap.id}')">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function generateAssigneeOptions(selectedUid) {
+  let options = "";
+  Object.entries(membersData).forEach(([uid,data])=>{
+    options += `
+      <option value="${uid}"
+        ${uid === selectedUid ? "selected" : ""}>
+        ${data.name}
+      </option>
+    `;
+  });
+  return options;
+}
+
+function generatePriorityOptions(selectedPriority){
+  const priorities = ["low","medium","high"];
+  return priorities.map(p=>`
+    <option value="${p}"
+      ${p === selectedPriority ? "selected" : ""}>
+      ${p}
+    </option>
+  `).join("");
+}
+
+window.editTask = async function(taskId, field, value){
+
+  await updateDoc(
+    doc(db,"projects",projectId,"tasks",taskId),
+    { [field]: value }
+  );
+
+  await updateDoc(
+    doc(db,"projects",projectId),
+    { lastUpdated: serverTimestamp() }
+  );
+};
+
+window.changeAssignee = async function(taskId, newUid){
+
+  const newName = membersData[newUid].name;
+
+  await updateDoc(
+    doc(db,"projects",projectId,"tasks",taskId),
+    {
+      assignedTo: newUid,
+      assignedToName: newName
+    }
+  );
+
+  await updateDoc(
+    doc(db,"projects",projectId),
+    { lastUpdated: serverTimestamp() }
+  );
+};
+
+window.deleteTask = async function(taskId){
+
+  await deleteDoc(
+    doc(db,"projects",projectId,"tasks",taskId)
+  );
+
+  await updateDoc(
+    doc(db,"projects",projectId),
+    { lastUpdated: serverTimestamp() }
+  );
+
+  loadTasks();
+};
