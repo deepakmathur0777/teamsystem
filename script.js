@@ -14,7 +14,7 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-/* ================= FIREBASE CONFIG ================= */
+/* ================= CONFIG ================= */
 
 const firebaseConfig = {
   apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
@@ -26,13 +26,12 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-/* ================= PROJECT CONTEXT ================= */
+/* ================= PROJECT ================= */
 
 const params = new URLSearchParams(window.location.search);
 const projectId = params.get("project");
 
 if (!projectId) {
-  alert("No project selected");
   window.location.href = "main.html";
 }
 
@@ -42,7 +41,7 @@ let progressChart = null;
 let weeklyChart = null;
 let lastLoadedTimestamp = null;
 
-/* ================= AUTH CHECK ================= */
+/* ================= AUTH ================= */
 
 onAuthStateChanged(auth, async (user) => {
 
@@ -53,11 +52,9 @@ onAuthStateChanged(auth, async (user) => {
 
   currentUser = user;
 
-  const projectRef = doc(db, "projects", projectId);
-  const projectSnap = await getDoc(projectRef);
+  const projectSnap = await getDoc(doc(db, "projects", projectId));
 
   if (!projectSnap.exists()) {
-    alert("Project not found");
     window.location.href = "main.html";
     return;
   }
@@ -66,26 +63,25 @@ onAuthStateChanged(auth, async (user) => {
   const members = projectData.members || {};
 
   if (!members[currentUser.uid]) {
-    alert("Access denied");
     window.location.href = "main.html";
     return;
   }
 
-  currentUserRole = members[currentUser.uid];
+  currentUserRole = members[currentUser.uid].role;
 
-  /* ===== Update Header ===== */
+  /* ===== HEADER ===== */
 
   document.querySelector(".hero h2").innerText =
     "Team Transparency Dashboard - " + projectData.name;
 
-  /* ===== Link Personal Page ===== */
+  /* ===== PERSONAL LINK ===== */
 
   const personalBtn = document.getElementById("personalBtn");
   if (personalBtn) {
     personalBtn.href = `personal.html?project=${projectId}`;
   }
 
-  /* ===== Link Assign Page (Admin Only) ===== */
+  /* ===== ASSIGN LINK (ADMIN ONLY) ===== */
 
   const assignBtn = document.getElementById("assignBtn");
   if (assignBtn) {
@@ -98,20 +94,17 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   loadMembers(members);
-  await loadTasks();   // Initial load
-  listenForProjectUpdates();  // Lightweight listener
+  await loadTasks();
+  listenForUpdates();
 });
 
-/* ================= LIGHTWEIGHT PROJECT LISTENER ================= */
+/* ================= LIGHTWEIGHT LISTENER ================= */
 
-function listenForProjectUpdates() {
+function listenForUpdates() {
 
-  const projectRef = doc(db, "projects", projectId);
+  onSnapshot(doc(db, "projects", projectId), (docSnap) => {
 
-  onSnapshot(projectRef, (docSnap) => {
-
-    const data = docSnap.data();
-    const updated = data?.lastUpdated?.toMillis?.() || null;
+    const updated = docSnap.data()?.lastUpdated?.toMillis?.();
 
     if (!updated) return;
 
@@ -131,8 +124,9 @@ function listenForProjectUpdates() {
 
 async function loadTasks() {
 
-  const tasksRef = collection(db, "projects", projectId, "tasks");
-  const snapshot = await getDocs(tasksRef);
+  const snapshot = await getDocs(
+    collection(db, "projects", projectId, "tasks")
+  );
 
   let total = 0;
   let completed = 0;
@@ -150,7 +144,7 @@ async function loadTasks() {
     total++;
 
     const status = data.status || "pending";
-    const createdAt = data.createdAt?.toDate?.() || null;
+    const createdAt = data.createdAt?.toDate?.();
     const dueDate = data.deadline ? new Date(data.deadline) : null;
 
     if (status === "completed") completed++;
@@ -167,7 +161,7 @@ async function loadTasks() {
     table.innerHTML += `
       <tr>
         <td>${data.title}</td>
-        <td>${data.assignedTo || "—"}</td>
+        <td>${data.assignedToName || "—"}</td>
         <td>
           <span class="badge ${status === "completed" ? "completed" : "pending"}">
             ${status}
@@ -181,17 +175,17 @@ async function loadTasks() {
   updateCharts(completed, pending, weeklyData);
 }
 
-/* ================= UPDATE STATS ================= */
+/* ================= STATS ================= */
 
 function updateStats(total, completed, pending, overdue) {
 
-  const completionRate = total
-    ? Math.round((completed / total) * 100)
-    : 0;
+  const completionRate =
+    total ? Math.round((completed / total) * 100) : 0;
 
-  const efficiencyRate = (completed + pending)
-    ? Math.round((completed / (completed + pending)) * 100)
-    : 0;
+  const efficiencyRate =
+    (completed + pending)
+      ? Math.round((completed / (completed + pending)) * 100)
+      : 0;
 
   document.getElementById("totalTasks").innerText = total;
   document.getElementById("completedTasks").innerText = completed;
@@ -206,19 +200,19 @@ function updateStats(total, completed, pending, overdue) {
 
 function loadMembers(members) {
 
-  const memberStats = document.getElementById("memberStats");
-  memberStats.innerHTML = "";
+  const container = document.getElementById("memberStats");
+  container.innerHTML = "";
 
-  Object.entries(members).forEach(([uid, role]) => {
+  Object.values(members).forEach(member => {
 
-    memberStats.innerHTML += `
+    container.innerHTML += `
       <div class="member-card" onclick="toggleMember(this)">
-        <strong>${uid}</strong>
-        <span class="badge ${role === "admin" ? "completed" : "pending"}">
-          ${role}
+        <strong>${member.name}</strong>
+        <span class="badge ${member.role === "admin" ? "completed" : "pending"}">
+          ${member.role}
         </span>
         <div class="member-tasks">
-          Role: ${role}
+          Role: ${member.role}
         </div>
       </div>
     `;
@@ -238,9 +232,7 @@ function updateCharts(completed, pending, weeklyData) {
       type: "doughnut",
       data: {
         labels: ["Completed", "Pending"],
-        datasets: [{
-          data: [completed, pending]
-        }]
+        datasets: [{ data: [completed, pending] }]
       }
     }
   );
