@@ -14,7 +14,7 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-/* ================= FIREBASE CONFIG ================= */
+/* ================= CONFIG ================= */
 
 const firebaseConfig = {
   apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
@@ -26,18 +26,18 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-/* ================= PROJECT CONTEXT ================= */
+/* ================= PROJECT ================= */
 
 const params = new URLSearchParams(window.location.search);
 const projectId = params.get("project");
 
 if (!projectId) {
-  alert("No project selected");
   window.location.href = "main.html";
 }
 
 let currentUser = null;
 let currentUserRole = null;
+let projectMembers = {};
 
 /* ================= AUTH + ADMIN CHECK ================= */
 
@@ -50,25 +50,22 @@ onAuthStateChanged(auth, async (user) => {
 
   currentUser = user;
 
-  const projectRef = doc(db, "projects", projectId);
-  const projectSnap = await getDoc(projectRef);
+  const projectSnap = await getDoc(doc(db, "projects", projectId));
 
   if (!projectSnap.exists()) {
-    alert("Project not found");
     window.location.href = "main.html";
     return;
   }
 
   const projectData = projectSnap.data();
-  const members = projectData.members || {};
+  projectMembers = projectData.members || {};
 
-  if (!members[currentUser.uid]) {
-    alert("Access denied");
+  if (!projectMembers[currentUser.uid]) {
     window.location.href = "main.html";
     return;
   }
 
-  currentUserRole = members[currentUser.uid];
+  currentUserRole = projectMembers[currentUser.uid].role;
 
   if (currentUserRole !== "admin") {
     alert("Only Admin can assign tasks");
@@ -76,9 +73,7 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  populateDropdown(members);
-
-  console.log("Admin verified for this project");
+  populateDropdown(projectMembers);
 });
 
 /* ================= POPULATE DROPDOWN ================= */
@@ -88,22 +83,21 @@ function populateDropdown(members) {
   const dropdown = document.getElementById("userDropdown");
   dropdown.innerHTML = "";
 
-  Object.keys(members).forEach(uid => {
+  Object.entries(members).forEach(([uid, memberData]) => {
 
     const option = document.createElement("option");
     option.value = uid;
 
     option.textContent =
       uid === currentUser.uid
-        ? uid + " (You)"
-        : uid;
+        ? memberData.name + " (You)"
+        : memberData.name;
 
     dropdown.appendChild(option);
   });
-
 }
 
-/* ================= SUB TASK UI ================= */
+/* ================= ADD SUBTASK ================= */
 
 window.addSubTask = function () {
 
@@ -142,6 +136,8 @@ document.getElementById("assignForm")
     return;
   }
 
+  /* ===== Collect Subtasks ===== */
+
   const subInputs = document.querySelectorAll(".subInput");
   const subTasks = [];
 
@@ -156,12 +152,14 @@ document.getElementById("assignForm")
 
   try {
 
-    // 🔥 Create Main Task
+    const assignedMember = projectMembers[assignedTo];
+
     await addDoc(
       collection(db, "projects", projectId, "tasks"),
       {
         title,
         assignedTo,
+        assignedToName: assignedMember.name,
         deadline,
         priority,
         subTasks,
@@ -170,12 +168,11 @@ document.getElementById("assignForm")
       }
     );
 
-    // 🔥 Trigger lightweight dashboard refresh
+    /* ===== Trigger Lightweight Refresh ===== */
+
     await updateDoc(
       doc(db, "projects", projectId),
-      {
-        lastUpdated: serverTimestamp()
-      }
+      { lastUpdated: serverTimestamp() }
     );
 
     document.getElementById("message").innerText =
@@ -189,7 +186,5 @@ document.getElementById("assignForm")
     console.error(error);
     document.getElementById("message").innerText =
       "❌ Failed to assign task";
-
   }
-
 });
