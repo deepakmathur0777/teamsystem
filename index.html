@@ -1,281 +1,299 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Team Transparency Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>Workspaces | HireLens</title>
 
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
+  <style>
+    body {
+      background:#0f172a;
+      color:white;
+      font-family:Arial;
+      margin:0;
+    }
 
-body{
-  font-family:Inter,Segoe UI,sans-serif;
-  background:radial-gradient(circle at top,#0f1e44,#07122a);
-  color:#e5e7eb;
-}
+    .container {
+      max-width:1100px;
+      margin:auto;
+      padding:40px;
+    }
 
-/* ===== CONTAINER ===== */
-.container{
-  max-width:1400px;
-  margin:auto;
-  padding:20px;
-  display:grid;
-  grid-template-columns:2fr 1fr;
-  gap:18px;
-}
+    .hero {
+      background:linear-gradient(135deg,#0d1b3a,#1e293b);
+      padding:30px;
+      border-radius:16px;
+      margin-bottom:40px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
 
-/* ===== HERO ===== */
-.hero{
-  grid-column:1/span 2;
-  background:linear-gradient(135deg,#0d1b3a,#1e3a8a);
-  padding:18px 20px;
-  border-radius:16px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  box-shadow:0 10px 30px rgba(0,0,0,.35);
-}
+    .subtitle {
+      opacity:0.7;
+      margin-top:6px;
+    }
 
-.hero h2{font-weight:600;}
+    .btn {
+      padding:10px 18px;
+      border-radius:8px;
+      border:none;
+      cursor:pointer;
+      font-weight:bold;
+      margin-left:8px;
+    }
 
-.hero-buttons{
-  display:flex;
-  gap:10px;
-}
+    .primary { background:#3b82f6; color:white; }
+    .secondary { background:#1e293b; color:white; }
 
-.switch-btn{
-  background:linear-gradient(135deg,#3b82f6,#2563eb);
-  color:white;
-  padding:6px 14px;
-  border-radius:8px;
-  text-decoration:none;
-  font-size:13px;
-  transition:.25s;
-}
-.switch-btn:hover{
-  transform:translateY(-2px);
-  box-shadow:0 6px 16px rgba(0,0,0,.35);
-}
+    .project-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+      gap:20px;
+    }
 
-/* ===== STATS ===== */
-.stats{
-  grid-column:1/span 2;
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:14px;
-}
+    .project-card {
+      background:#1e293b;
+      padding:20px;
+      border-radius:12px;
+      cursor:pointer;
+      transition:0.3s;
+    }
 
-.card{
-  background:#0d1b3a;
-  padding:14px;
-  border-radius:14px;
-  text-align:center;
-  box-shadow:0 4px 16px rgba(0,0,0,.3);
-  transition:.25s;
-}
-.card:hover{transform:translateY(-4px);}
+    .project-card:hover {
+      background:#334155;
+      transform:translateY(-4px);
+    }
 
-.card h3{
-  color:#38bdf8;
-  font-size:24px;
-}
-.card p{
-  font-size:12px;
-  opacity:.7;
-}
+    .role-badge {
+      font-size:12px;
+      padding:4px 8px;
+      border-radius:6px;
+      margin-top:8px;
+      display:inline-block;
+    }
 
-/* ===== PROGRESS BAR ===== */
-.progress-container{
-  grid-column:1/span 2;
-  background:#0d1b3a;
-  border-radius:10px;
-  overflow:hidden;
-  height:14px;
-  box-shadow:0 4px 16px rgba(0,0,0,.3);
-}
+    .admin { background:#16a34a; }
+    .member { background:#6366f1; }
 
-.progress-bar{
-  height:100%;
-  background:linear-gradient(90deg,#22c55e,#06b6d4);
-  width:0%;
-}
+    .invite-box {
+      margin-top:15px;
+      font-size:12px;
+      opacity:0.8;
+      word-break:break-all;
+    }
 
-/* ===== TABLE ===== */
-.table-section{
-  background:#0d1b3a;
-  border-radius:14px;
-  padding:14px;
-  overflow:auto;
-  max-height:70vh;
-  box-shadow:0 6px 20px rgba(0,0,0,.35);
-}
-
-.table-section h3{
-  margin-bottom:10px;
-}
-
-table{
-  width:100%;
-  border-collapse:collapse;
-}
-
-th{
-  background:#162447;
-  padding:10px;
-  text-align:left;
-}
-
-td{
-  padding:10px;
-  border-bottom:1px solid #162447;
-}
-
-tr:hover{
-  background:#14213d;
-}
-
-/* ===== SIDE ===== */
-.side{
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-}
-
-.chart-card,
-.member-box{
-  background:#0d1b3a;
-  border-radius:14px;
-  padding:14px;
-  box-shadow:0 6px 20px rgba(0,0,0,.35);
-}
-
-.chart-card canvas{
-  height:180px !important;
-}
-
-/* ===== MEMBERS ===== */
-.member-box{
-  overflow:auto;
-  max-height:60vh;
-}
-
-.member-card{
-  background:#07122a;
-  padding:10px;
-  border-radius:8px;
-  margin-bottom:8px;
-  cursor:pointer;
-  transition:.2s;
-}
-
-.member-card:hover{
-  background:#14213d;
-}
-
-.member-tasks{
-  display:none;
-  margin-top:6px;
-  font-size:12px;
-}
-
-.member-card.open .member-tasks{
-  display:block;
-}
-
-.badge{
-  padding:2px 6px;
-  border-radius:6px;
-  font-size:10px;
-}
-
-.completed{background:#16a34a;}
-.pending{background:#d97706;}
-
-.member-search{
-  padding:6px;
-  border-radius:6px;
-  border:none;
-}
-</style>
+    .empty-state {
+      text-align:center;
+      margin-top:80px;
+      opacity:0.8;
+    }
+  </style>
 </head>
 
 <body>
 
 <div class="container">
 
-<!-- HERO -->
-<div class="hero">
-  <h2>Team Transparency Dashboard</h2>
+  <div class="hero">
+    <div>
+      <h1 id="welcomeText">Welcome 👋</h1>
+      <p class="subtitle">
+        Manage teams. Track work. Stay in control.
+      </p>
+    </div>
 
-  <div class="hero-buttons">
-    <a href="personal.html" class="switch-btn">👤 Personal Dashboard</a>
-    <input id="memberFilter" class="member-search" placeholder="Search member...">
-  </div>
-</div>
-
-<!-- STATS -->
-<div class="stats">
-  <div class="card"><h3 id="totalTasks">0</h3><p>Total Tasks</p></div>
-  <div class="card"><h3 id="completedTasks">0</h3><p>Completed</p></div>
-  <div class="card"><h3 id="pendingTasks">0</h3><p>Pending</p></div>
-  <div class="card"><h3 id="overdueTasks">0</h3><p>Overdue</p></div>
-  <div class="card"><h3 id="completionRate">0%</h3><p>Completion %</p></div>
-  <div class="card"><h3 id="efficiencyRate">0%</h3><p>Efficiency %</p></div>
-</div>
-
-<div class="progress-container">
-  <div id="progressBar" class="progress-bar"></div>
-</div>
-
-<!-- TABLE -->
-<div class="table-section">
-  <h3>Task List</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Assigned</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody id="taskTable"></tbody>
-  </table>
-</div>
-
-<!-- SIDE -->
-<div class="side">
-
-  <div class="chart-card">
-    <h3>Work Distribution</h3>
-    <canvas id="progressChart"></canvas>
+    <div>
+      <button class="btn primary" onclick="createProject()">+ New Project</button>
+    </div>
   </div>
 
-  <div class="chart-card">
-    <h3>Weekly Trend</h3>
-    <canvas id="weeklyChart"></canvas>
-  </div>
+  <h2>Your Workspaces</h2>
 
-  <div class="member-box">
-    <h3>Members</h3>
-    <div id="memberStats"></div>
+  <div id="projectsContainer" class="project-grid"></div>
+
+  <div id="emptyState" class="empty-state" style="display:none;">
+    <h2>No Projects Yet</h2>
+    <button class="btn primary" onclick="createProject()">
+      Create First Project
+    </button>
   </div>
 
 </div>
 
-</div>
+<script type="module">
 
-<script>
-document.getElementById("memberFilter").addEventListener("input", e=>{
-  const text=e.target.value.toLowerCase();
-  document.querySelectorAll(".member-card").forEach(card=>{
-    card.style.display =
-      card.innerText.toLowerCase().includes(text)
-        ? "block":"none";
-  });
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+/* CONFIG */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD3exFsBPPO6tCl5PgURMzgzGmg9nRhhCo",
+  authDomain: "hirelens-studio.firebaseapp.com",
+  projectId: "hirelens-studio"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser;
+let currentUserName;
+
+/* ================= AUTH ================= */
+
+onAuthStateChanged(auth, async (user) => {
+
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  currentUser = user;
+
+  const userSnap = await getDoc(doc(db,"users",user.uid));
+  currentUserName = userSnap.data().name;
+
+  document.getElementById("welcomeText").innerText =
+    `Welcome back, ${currentUserName} 👋`;
+
+  checkInviteLink();
+  loadProjects();
 });
-function toggleMember(el){ el.classList.toggle("open"); }
-</script>
 
-<script type="module" src="script.js"></script>
+/* ================= LOAD PROJECTS ================= */
+
+async function loadProjects(){
+
+  const snapshot = await getDocs(collection(db,"projects"));
+
+  const container = document.getElementById("projectsContainer");
+  container.innerHTML = "";
+
+  let hasProjects = false;
+
+  snapshot.forEach(docSnap => {
+
+    const data = docSnap.data();
+    const members = data.members || {};
+
+    if (members[currentUser.uid]) {
+
+      hasProjects = true;
+
+      const role = members[currentUser.uid].role;
+      const inviteLink = `${window.location.origin}/main.html?invite=${data.inviteCode}`;
+
+      container.innerHTML += `
+        <div class="project-card"
+             onclick="openProject('${docSnap.id}','${role}')">
+
+          <h3>${data.name}</h3>
+
+          <span class="role-badge ${role}">
+            ${role}
+          </span>
+
+          ${role === "admin" ? `
+            <div class="invite-box">
+              Invite Link:<br>
+              ${inviteLink}
+            </div>
+          ` : ""}
+
+        </div>
+      `;
+    }
+  });
+
+  document.getElementById("emptyState").style.display =
+    hasProjects ? "none" : "block";
+}
+
+/* ================= SMART REDIRECTION ================= */
+
+window.openProject = function(projectId, role){
+
+  if (role === "admin") {
+    window.location.href = `admin.html?project=${projectId}`;
+  } else {
+    window.location.href = `dashboard.html?project=${projectId}`;
+  }
+};
+
+/* ================= CREATE PROJECT ================= */
+
+window.createProject = async function(){
+
+  const name = prompt("Enter Project Name:");
+  if (!name) return;
+
+  const inviteCode = Math.random()
+    .toString(36)
+    .substring(2,8)
+    .toUpperCase();
+
+  await addDoc(collection(db,"projects"),{
+    name,
+    createdBy: currentUser.uid,
+    inviteCode,
+    createdAt:new Date(),
+    members:{
+      [currentUser.uid]:{
+        role:"admin",
+        name:currentUserName
+      }
+    }
+  });
+
+  loadProjects();
+};
+
+/* ================= INVITE LINK JOIN ================= */
+
+async function checkInviteLink(){
+
+  const params = new URLSearchParams(window.location.search);
+  const inviteCode = params.get("invite");
+
+  if (!inviteCode) return;
+
+  const q = query(
+    collection(db,"projects"),
+    where("inviteCode","==",inviteCode)
+  );
+
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    alert("Invalid invite link");
+    return;
+  }
+
+  snapshot.forEach(async (docSnap)=>{
+
+    const data = docSnap.data();
+    const members = data.members || {};
+
+    if (!members[currentUser.uid]) {
+
+      members[currentUser.uid] = {
+        role:"member",
+        name:currentUserName
+      };
+
+      await updateDoc(doc(db,"projects",docSnap.id),{
+        members
+      });
+
+      alert("Successfully joined project 🎉");
+    }
+  });
+
+  loadProjects();
+}
+
+</script>
 
 </body>
 </html>
